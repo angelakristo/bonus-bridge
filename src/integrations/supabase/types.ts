@@ -1041,6 +1041,33 @@ export type Database = {
           },
         ]
       }
+      setup_progress: {
+        Row: {
+          entity_id: string
+          id: string
+          status: Database["public"]["Enums"]["setup_step_status"]
+          step_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          entity_id: string
+          id?: string
+          status?: Database["public"]["Enums"]["setup_step_status"]
+          step_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          entity_id?: string
+          id?: string
+          status?: Database["public"]["Enums"]["setup_step_status"]
+          step_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       v_bonus_projections: {
@@ -1242,6 +1269,7 @@ export type Database = {
       kpi_status: "draft" | "pending_approval" | "approved" | "rejected"
       kpi_type: "progressive" | "binary" | "benchmark"
       period: "q1" | "q2" | "q3" | "q4" | "h1" | "h2" | "halfyear" | "fullyear"
+      setup_step_status: "not_started" | "in_progress" | "complete"
       upload_status: "processing" | "success" | "failed"
       upload_type: "employees" | "actuals"
       user_role: "ceo" | "manager" | "hr_rep" | "employee"
@@ -1377,6 +1405,7 @@ export const Constants = {
       kpi_status: ["draft", "pending_approval", "approved", "rejected"],
       kpi_type: ["progressive", "binary", "benchmark"],
       period: ["q1", "q2", "q3", "q4", "h1", "h2", "halfyear", "fullyear"],
+      setup_step_status: ["not_started", "in_progress", "complete"],
       upload_status: ["processing", "success", "failed"],
       upload_type: ["employees", "actuals"],
       user_role: ["ceo", "manager", "hr_rep", "employee"],

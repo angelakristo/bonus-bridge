@@ -106,11 +106,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     await supabase.auth.signOut();
+    setSession(null);
+    setSupabaseUser(null);
+    setPerson(null);
+    setRoles([]);
+  };
+
+  const devPreviewSignIn = (role: UserRole) => {
+    // Dev-only: injects an in-memory mock session so protected screens render.
+    // No Supabase writes; queries depending on a real auth user will return empty.
+    const mockUserId = "dev-preview-user";
+    const mockSession = {
+      access_token: "dev-preview",
+      refresh_token: "dev-preview",
+      expires_in: 3600,
+      expires_at: Math.floor(Date.now() / 1000) + 3600,
+      token_type: "bearer",
+      user: { id: mockUserId, email: `${role}@preview.local` } as User,
+    } as unknown as Session;
+    setSession(mockSession);
+    setSupabaseUser(mockSession.user);
+    setPerson({
+      id: "dev-preview-person",
+      entity_id: "dev-preview-entity",
+      first_name: "Preview",
+      last_name: role.toUpperCase(),
+    });
+    setRoles([role]);
+    setLoading(false);
   };
 
   return (
     <AuthContext.Provider
-      value={{ session, supabaseUser, person, roles, loading, signIn, signOut }}
+      value={{ session, supabaseUser, person, roles, loading, signIn, signOut, devPreviewSignIn }}
     >
       {children}
     </AuthContext.Provider>

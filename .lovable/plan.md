@@ -1,53 +1,32 @@
 
 
 ## Goal
-Build a Login screen + AuthContext that authenticates via Supabase, fetches the user's `people` row + `people_roles`, and exposes everything app-wide.
+Add two new React contexts on top of the existing `AuthContext`:
 
-## Schema confirmation (from existing tables — read-only)
-- `people`: `id`, `entity_id`, `first_name`, `last_name`, `email`, `auth_user_id` — RLS uses `get_my_entity_id()` so a logged-in user can SELECT their own row.
-- `people_roles`: `id`, `person_id`, `role` (enum `user_role`) — no RLS policy listed; will rely on existing access. Will query by `person_id`.
-
-No DB changes. No new tables. Existing `auth.users` is used by Supabase Auth.
+1. **`EntityContext`** — exposes `entity_id` and `entity_name`, populated from the `entities` table after login.
+2. **`YearContext`** — exposes `selected_year` (number) and a setter, defaulting to the current calendar year.
 
 ## Files to create
 
-1. **`src/contexts/AuthContext.tsx`**
-   - `AuthProvider` + `useAuth()` hook.
-   - State: `session`, `supabaseUser`, `person` (`{id, entity_id, first_name, last_name}`), `roles` (`string[]`), `loading`.
-   - On mount: set up `supabase.auth.onAuthStateChange` FIRST, then call `getSession()` (per Supabase best practice).
-   - When a session exists, fetch person + roles. Use `setTimeout(..., 0)` inside the auth callback before any supabase calls to avoid the known deadlock.
-   - Expose `signIn(email, password)` and `signOut()`.
-   - Clear person/roles on `SIGNED_OUT`.
+1. **`src/contexts/EntityContext.tsx`**
+   - `EntityProvider` reads `person.entity_id` from `useAuth()`.
+   - When `entity_id` is available, query `entities` table: `select('id, name').eq('id', entity_id).maybeSingle()`.
+   - State: `entity_id: string | null`, `entity_name: string | null`, `loading: boolean`.
+   - Resets to nulls when user signs out (entity_id becomes null).
+   - Hook: `useEntity()`.
 
-2. **`src/routes/login.tsx`**
-   - Email + password form (shadcn `Card`, `Input`, `Label`, `Button`).
-   - Calls `signIn` from `useAuth()`. Toast errors via `sonner`.
-   - If already authenticated, redirect to `/`.
-   - On success, navigate to `/` (or `?redirect=` search param if present).
+2. **`src/contexts/YearContext.tsx`**
+   - `YearProvider` with state `selected_year: number` (default `new Date().getFullYear()`) and `setSelectedYear(year)`.
+   - Hook: `useYear()`.
 
-3. **`src/routes/__root.tsx`** (modify)
-   - Wrap `<Outlet />` with `<AuthProvider>` inside `RootComponent`.
-   - Mount `<Toaster />` from `@/components/ui/sonner`.
+## Files to modify
 
-4. **`src/routes/index.tsx`** (modify)
-   - Replace placeholder. If not authenticated → redirect to `/login`.
-   - If authenticated → simple landing showing `Welcome, {first_name}`, entity id, roles list, and a Sign out button. (Minimal — real dashboard comes later.)
-
-## Auth flow
-
-```text
-Login form → supabase.auth.signInWithPassword
-        ↓
-onAuthStateChange fires (SIGNED_IN)
-        ↓
-setTimeout(0) → fetch people row (auth_user_id = user.id)
-             → fetch people_roles (person_id = people.id)
-        ↓
-AuthContext state populated → app re-renders
-```
+3. **`src/routes/__root.tsx`**
+   - Wrap `<Outlet />` inside the existing `<AuthProvider>` with `<EntityProvider>` then `<YearProvider>`.
+   - Order: `AuthProvider → EntityProvider → YearProvider → Outlet` (Entity depends on Auth; Year is independent but placed inside for consistent access).
 
 ## Notes
-- No `/signup` or password reset in this step (not requested). Users must already exist in `auth.users` AND have a matching `people` row with `auth_user_id` set.
-- No protected route layout (`_authenticated`) added yet — only `index.tsx` checks auth. We can add `_authenticated/` layout later when more protected pages exist.
-- Session persists via `localStorage` (already configured in `client.ts`).
+- No DB changes. Uses existing `entities` table (RLS via `get_my_entity_id()` — the user can SELECT their own entity).
+- `YearContext` is purely client-side, no DB.
+- Will not modify `index.tsx` to display entity_name (out of scope — only contexts requested), but contexts will be available app-wide for future pages.
 

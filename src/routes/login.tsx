@@ -72,12 +72,8 @@ function LoginPage() {
           <img
             src={bonusbridgeLogo}
             alt="BonusBridge"
-            className="mb-4 h-24 w-auto drop-shadow-sm"
+            className="h-28 w-auto drop-shadow-sm"
           />
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground">BonusBridge</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Bridging performance to reward.
-          </p>
         </div>
 
         <Card className="border-border/60 shadow-xl shadow-primary/5 backdrop-blur">

@@ -48,9 +48,29 @@ function RegisterEntityPage() {
     });
   };
 
+  const isHrRep = roles.includes("hr_rep");
+
   useEffect(() => {
+    console.log("[RegisterEntity] AuthContext roles array on mount:", roles, "isHrRep:", isHrRep);
     logRegisterEntity(null, "register-entity screen rendered");
-  }, [authLoading, authReady, entityLoading, entity_id, location.pathname, roles, submitting, supabaseUser?.id]);
+  }, [authLoading, authReady, entityLoading, entity_id, location.pathname, roles, submitting, supabaseUser?.id, isHrRep]);
+
+  useEffect(() => {
+    if (!authReady || authLoading) return;
+    if (!isHrRep) {
+      console.log("[RegisterEntity] Access denied — user is not hr_rep", { roles, redirectTarget: "/dashboard" });
+      toast.error("Access denied: only HR Reps can register a company");
+      navigate({ to: "/dashboard", replace: true });
+    }
+  }, [authReady, authLoading, isHrRep, roles, navigate]);
+
+  if (authReady && !authLoading && !isHrRep) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Access denied. Redirecting...</p>
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

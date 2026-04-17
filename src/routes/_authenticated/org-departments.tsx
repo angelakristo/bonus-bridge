@@ -357,6 +357,36 @@ function DeleteDialog({
   onDeleted: () => void;
 }) {
   const [submitting, setSubmitting] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [assignedCount, setAssignedCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (!target) {
+      setAssignedCount(null);
+      return;
+    }
+    let cancelled = false;
+    setChecking(true);
+    supabase
+      .from("people_org_departments")
+      .select("person_id", { count: "exact", head: true })
+      .eq("org_department_id", target.id)
+      .then(({ count, error }) => {
+        if (cancelled) return;
+        setChecking(false);
+        if (error) {
+          toast.error(error.message);
+          setAssignedCount(0);
+          return;
+        }
+        setAssignedCount(count ?? 0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [target]);
+
+  const hasAssignedPeople = (assignedCount ?? 0) > 0;
 
   const handleDelete = async () => {
     if (!target) return;
@@ -378,15 +408,18 @@ function DeleteDialog({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete "{target?.name}"?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. Child departments will become orphaned and may need to be
-            reassigned.
+            {checking
+              ? "Checking assignments..."
+              : hasAssignedPeople
+                ? "This department has people assigned to it. Reassign them before deleting."
+                : "This action cannot be undone. Child departments will become orphaned and may need to be reassigned."}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
           <AlertDialogAction
             onClick={handleDelete}
-            disabled={submitting}
+            disabled={submitting || checking || hasAssignedPeople}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
             {submitting ? "Deleting..." : "Delete"}

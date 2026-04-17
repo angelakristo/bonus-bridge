@@ -14,6 +14,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedRegisterEntityRouteImport } from './routes/_authenticated/register-entity'
+import { Route as AuthenticatedOrgDepartmentsRouteImport } from './routes/_authenticated/org-departments'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
 const LoginRoute = LoginRouteImport.update({
@@ -41,6 +42,12 @@ const AuthenticatedRegisterEntityRoute =
     path: '/register-entity',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedOrgDepartmentsRoute =
+  AuthenticatedOrgDepartmentsRouteImport.update({
+    id: '/org-departments',
+    path: '/org-departments',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -51,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/org-departments': typeof AuthenticatedOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/setup': typeof AuthenticatedSetupRoute
 }
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/org-departments': typeof AuthenticatedOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/setup': typeof AuthenticatedSetupRoute
 }
@@ -67,20 +76,34 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/org-departments': typeof AuthenticatedOrgDepartmentsRoute
   '/_authenticated/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/login' | '/dashboard' | '/register-entity' | '/setup'
+  fullPaths:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/org-departments'
+    | '/register-entity'
+    | '/setup'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/login' | '/dashboard' | '/register-entity' | '/setup'
+  to:
+    | '/'
+    | '/login'
+    | '/dashboard'
+    | '/org-departments'
+    | '/register-entity'
+    | '/setup'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
     | '/_authenticated/dashboard'
+    | '/_authenticated/org-departments'
     | '/_authenticated/register-entity'
     | '/_authenticated/setup'
   fileRoutesById: FileRoutesById
@@ -128,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRegisterEntityRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/org-departments': {
+      id: '/_authenticated/org-departments'
+      path: '/org-departments'
+      fullPath: '/org-departments'
+      preLoaderRoute: typeof AuthenticatedOrgDepartmentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -140,12 +170,14 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedOrgDepartmentsRoute: typeof AuthenticatedOrgDepartmentsRoute
   AuthenticatedRegisterEntityRoute: typeof AuthenticatedRegisterEntityRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedOrgDepartmentsRoute: AuthenticatedOrgDepartmentsRoute,
   AuthenticatedRegisterEntityRoute: AuthenticatedRegisterEntityRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
 }

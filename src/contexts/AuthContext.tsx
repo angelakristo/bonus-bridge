@@ -7,7 +7,7 @@ type UserRole = Database["public"]["Enums"]["user_role"];
 
 export type Person = {
   id: string;
-  entity_id: string;
+  entity_id: string | null;
   first_name: string;
   last_name: string;
 };
@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSupabaseUser(mockSession.user);
     setPerson({
       id: "dev-preview-person",
-      entity_id: "dev-preview-entity",
+      entity_id: role === "hr_rep" ? null : "dev-preview-entity",
       first_name: "Preview",
       last_name: role.toUpperCase(),
     });

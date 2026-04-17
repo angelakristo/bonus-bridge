@@ -1,71 +1,74 @@
 
-Goal: stop the onboarding redirect race so `hr_rep` users with no `entity_id` can stay on `/register-entity`, and only move forward after registration updates `EntityContext`.
+Why it does not work now:
 
-What I found:
-- The only redirect/navigation logic affecting this flow is in:
-  - `src/routes/_authenticated.tsx`
-  - `src/routes/index.tsx`
-  - `src/routes/login.tsx`
-  - `src/routes/_authenticated/register-entity.tsx`
-- There is no separate `ProtectedRoute` or `beforeLoad` guard currently doing this.
-- The likely race comes from two places:
-  1. `AuthContext` bootstraps from both `onAuthStateChange` and `getSession()`, which can resolve at different times.
-  2. `EntityContext` clears to `null` immediately whenever `person?.entity_id` is missing, even during bootstrap.
-- `_authenticated.tsx` also contains a global redirect that can kick the user off `/register-entity` once state changes, instead of letting the registration screen control the post-success navigation.
+1. The screen itself already exists and the submit logic is basically correct. The failure is in the onboarding state model + redirect flow around it.
 
-Plan:
+2. There are two separate problems:
+- Redirect churn:
+  - `src/routes/login.tsx` sends a signed-in/preview user to `/`
+  - `src/routes/index.tsx` immediately sends any session to `/dashboard`
+  - `_authenticated.tsx` then tries to send `hr_rep` users without an entity to `/register-entity`
+  - That means the app is bouncing between routes instead of choosing the onboarding route once.
+- Schema/state mismatch:
+  - `EntityContext` derives `entity_id` from `person.entity_id`
+  - In your actual schema, `people.entity_id` is `NOT NULL`
+  - So a real database-backed user cannot truly be `hr_rep` with `entity_id = null` in `people`
+  - That means the condition from the prompt is only naturally reachable in preview/mock state, not through the current persisted profile shape
 
-1. Harden auth bootstrap in `src/contexts/AuthContext.tsx`
-- Refactor session/person/roles hydration into one shared resolver.
-- Add an explicit “auth ready” state so redirects do not run until auth is fully resolved.
-- Add temporary console logs for:
-  - authenticated user id
-  - resolved role(s)
-  - current pathname
-  - reason for redirect
+3. There is also a persistence gap:
+- `/register-entity` inserts into `entities` and updates `EntityContext` locally
+- but it does not write the new `entity_id` back to the user’s existing `people` row
+- so even if the current session moves forward, a later re-hydration can fall out of sync
 
-2. Add real loading guards in `src/contexts/EntityContext.tsx`
-- Make entity resolution wait for auth readiness instead of immediately clearing to `null` during auth bootstrap.
-- Keep `EntityContext.loading = true` until the app can confidently say either:
-  - the user has an entity, or
-  - the user truly has no entity
-- Preserve the existing `setEntity(id, name)` path so successful registration updates context immediately.
+Can I fix it?
+- Yes, I can fix the redirect race in code.
+- I can also make the onboarding route become the single source of truth for preview/onboarding flow.
+- But for real authenticated users, the exact state “`hr_rep` + no `entity_id` in `EntityContext` because profile has none” conflicts with the current `people.entity_id NOT NULL` schema, so that part is not just a UI bug.
 
-3. Replace the onboarding redirect logic in `src/routes/_authenticated.tsx`
-- Consolidate redirects into one guarded effect that runs only when auth + entity state are resolved.
-- Enforce this rule set:
-  - no session → `/login`
-  - `hr_rep` + no `entity_id` + not already on `/register-entity` → `/register-entity`
-  - `hr_rep` + no `entity_id` + already on `/register-entity` → stay there
-  - while auth/entity are still loading → do nothing
-- Remove/adjust the global redirect that currently pushes users away from `/register-entity` once state changes.
-- If needed, render `/register-entity` outside the normal shell while onboarding so it stays the primary screen.
+What I would change:
 
-4. Fix the registration success path in `src/routes/_authenticated/register-entity.tsx`
-- Keep using the existing `entities` table only.
-- On submit:
-  - insert `name`, `industry`, and `created_at`
-  - call `setEntity(returnedId, returnedName)`
-  - navigate directly to `/org-departments` with `replace`
-- Add temporary console logs for:
-  - user id
-  - resolved role
-  - resolved `entity_id`
-  - current pathname
-  - submit success / redirect reason
+1. `src/routes/login.tsx`
+- Stop blindly sending every successful sign-in/preview to `/`
+- After auth resolves, choose the destination once:
+  - `hr_rep` + no entity => `/register-entity`
+  - otherwise normal app route
+- This removes the first bounce
 
-5. End-to-end verification target
-- `hr_rep` with no `entity_id` signs in
-- app lands on `/register-entity`
-- no redirect away while loading resolves
-- submit inserts into `entities`
-- `EntityContext` updates immediately
-- app navigates to `/org-departments`
+2. `src/routes/index.tsx`
+- Remove the unconditional “session => `/dashboard`” redirect
+- Make `/` respect onboarding state instead of forcing dashboard first
+- This removes the second bounce
 
-Technical details:
-- Files to update:
-  - `src/contexts/AuthContext.tsx`
-  - `src/contexts/EntityContext.tsx`
-  - `src/routes/_authenticated.tsx`
-  - `src/routes/_authenticated/register-entity.tsx`
-- Important note from the current schema snapshot: `entities` currently appears to allow `SELECT` but not `INSERT` for client-side users. I will still fix the redirect/onboarding logic exactly as requested, but if that permission state is still active, the submit step will remain blocked by existing DB access rules rather than routing logic.
+3. `src/routes/_authenticated.tsx`
+- Keep one guarded redirect effect only
+- Do nothing until auth, roles/person, and entity are all resolved
+- If `hr_rep` and no entity:
+  - already on `/register-entity` => stay there
+  - not on `/register-entity` => send there
+- Only leave `/register-entity` after `EntityContext` has a real id
+
+4. `src/contexts/AuthContext.tsx`
+- Ensure auth bootstrap resolves once without late stale updates overriding route decisions
+- Keep the temporary console logs here
+
+5. `src/contexts/EntityContext.tsx`
+- Do not clear entity state until auth/profile resolution is truly finished
+- Preserve the manual `setEntity` override after registration so the success navigation is not undone
+
+6. `src/routes/_authenticated/register-entity.tsx`
+- Keep the existing `entities` insert
+- Keep `setEntity(returnedId, returnedName)`
+- Keep navigation to `/org-departments`
+- Keep temporary console logs
+
+Important limitation to be aware of:
+- Even after the redirect fix, a real DB-backed `hr_rep` with `people.entity_id = null` is not representable with the current schema you shared.
+- So I can fix the route race, but if you want this to work for real signed-in users rather than preview/mock users, the current persisted onboarding state does not fully line up with the requirement.
+
+Files I would audit/update for the actual fix:
+- `src/routes/login.tsx`
+- `src/routes/index.tsx`
+- `src/routes/_authenticated.tsx`
+- `src/contexts/AuthContext.tsx`
+- `src/contexts/EntityContext.tsx`
+- `src/routes/_authenticated/register-entity.tsx`

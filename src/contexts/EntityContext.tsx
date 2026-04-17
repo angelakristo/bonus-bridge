@@ -51,8 +51,14 @@ export function EntityProvider({ children }: { children: ReactNode }) {
     };
   }, [person?.entity_id]);
 
+  const setEntity = (id: string, name: string | null) => {
+    setEntityId(id);
+    setEntityName(name);
+    setLoading(false);
+  };
+
   return (
-    <EntityContext.Provider value={{ entity_id: entityId, entity_name: entityName, loading }}>
+    <EntityContext.Provider value={{ entity_id: entityId, entity_name: entityName, loading, setEntity }}>
       {children}
     </EntityContext.Provider>
   );

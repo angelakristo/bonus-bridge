@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -11,54 +11,86 @@ type EntityContextValue = {
 
 const EntityContext = createContext<EntityContextValue | undefined>(undefined);
 
+const getCurrentPathname = () => (typeof window !== "undefined" ? window.location.pathname : "server");
+
 export function EntityProvider({ children }: { children: ReactNode }) {
-  const { person, ready: authReady, session } = useAuth();
+  const { person, ready: authReady, loading: authLoading, session, roles, supabaseUser } = useAuth();
   const [entityId, setEntityId] = useState<string | null>(null);
   const [entityName, setEntityName] = useState<string | null>(null);
-  // Start as loading; only become ready after auth resolves AND we've evaluated person.
   const [loading, setLoading] = useState(true);
   const [manualOverride, setManualOverride] = useState(false);
+  const lastUserIdRef = useRef<string | null>(null);
+
+  const logEntityState = (redirectTarget: string | null, reason: string, resolvedEntityId?: string | null) => {
+    console.log("[Entity]", {
+      pathname: getCurrentPathname(),
+      userId: supabaseUser?.id ?? session?.user?.id ?? null,
+      role: roles[0] ?? null,
+      roles,
+      entity_id: resolvedEntityId ?? person?.entity_id ?? entityId ?? null,
+      loading: { authReady, authLoading, entityLoading: loading },
+      redirectTarget,
+      reason,
+    });
+  };
 
   useEffect(() => {
-    // Wait for auth to finish bootstrapping before deciding anything.
-    if (!authReady) {
-      console.log("[Entity] Waiting for auth to be ready...");
+    const currentUserId = session?.user?.id ?? null;
+    if (lastUserIdRef.current === currentUserId) return;
+
+    lastUserIdRef.current = currentUserId;
+    setManualOverride(false);
+
+    if (!currentUserId) {
+      setEntityId(null);
+      setEntityName(null);
+      logEntityState(null, "cleared entity state because auth user changed to none", null);
       return;
     }
 
-    // If a manual setEntity was called (e.g., right after registration), don't overwrite it.
-    if (manualOverride) {
-      setLoading(false);
+    logEntityState(null, "cleared manual entity override because auth user changed", entityId);
+  }, [entityId, roles, session?.user?.id, supabaseUser?.id]);
+
+  useEffect(() => {
+    if (!authReady || authLoading) {
+      setLoading(true);
+      logEntityState(null, "waiting for auth, role, and person resolution before resolving entity");
       return;
     }
 
-    // No session → no entity, resolved.
     if (!session) {
       setEntityId(null);
       setEntityName(null);
       setLoading(false);
-      console.log("[Entity] No session → entity_id=null (resolved)");
+      logEntityState(null, "resolved entity as null because there is no authenticated session", null);
       return;
     }
 
-    // Signed in but person row hasn't loaded yet — keep loading.
+    if (manualOverride) {
+      setLoading(false);
+      logEntityState(null, "keeping manual entity override after successful registration", entityId);
+      return;
+    }
+
     if (!person) {
-      setLoading(true);
-      console.log("[Entity] Auth ready, waiting on person row...");
+      setEntityId(null);
+      setEntityName(null);
+      setLoading(false);
+      logEntityState(null, "person/profile resolved as missing so entity stays null", null);
       return;
     }
 
-    // Person loaded but has no entity link → confirmed null.
     if (!person.entity_id) {
       setEntityId(null);
       setEntityName(null);
       setLoading(false);
-      console.log("[Entity] Person has no entity_id → resolved as null");
+      logEntityState(null, "person resolved without entity_id", null);
       return;
     }
 
     let cancelled = false;
     setLoading(true);
+    logEntityState(null, "fetching entity record for resolved entity_id", person.entity_id);
 
     supabase
       .from("entities")
@@ -67,29 +99,33 @@ export function EntityProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
       .then(({ data, error }) => {
         if (cancelled) return;
+
         if (error || !data) {
           console.error("[Entity] Failed to load entity:", error);
           setEntityId(person.entity_id);
           setEntityName(null);
-        } else {
-          setEntityId(data.id);
-          setEntityName(data.name);
+          setLoading(false);
+          logEntityState(null, "entity lookup failed; keeping resolved entity_id only", person.entity_id);
+          return;
         }
+
+        setEntityId(data.id);
+        setEntityName(data.name);
         setLoading(false);
-        console.log("[Entity] Resolved entity_id:", person.entity_id);
+        logEntityState(null, "entity resolved from entities table", data.id);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [authReady, session, person, manualOverride]);
+  }, [authReady, authLoading, session, person, manualOverride, entityId, roles, supabaseUser?.id]);
 
   const setEntity = (id: string, name: string | null) => {
     setEntityId(id);
     setEntityName(name);
     setLoading(false);
     setManualOverride(true);
-    console.log("[Entity] Manual setEntity:", id);
+    logEntityState("/org-departments", "manual entity update after successful registration", id);
   };
 
   return (

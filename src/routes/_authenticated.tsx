@@ -56,17 +56,6 @@ function AuthenticatedLayout() {
       return;
     }
 
-    if (needsEntityRegistration && onRegisterEntity) {
-      logGuard(null, "hr_rep without entity_id already on /register-entity, staying on onboarding screen");
-      return;
-    }
-
-    if (isHrRep && entity_id && onRegisterEntity) {
-      logGuard("/org-departments", "registration complete, leaving onboarding screen");
-      navigate({ to: "/org-departments", replace: true });
-      return;
-    }
-
     logGuard(null, person ? "stay on requested authenticated route" : "stay on requested route with resolved missing person profile");
   }, [
     authReady,

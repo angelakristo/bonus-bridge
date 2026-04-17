@@ -29,40 +29,55 @@ function RegisterEntityPage() {
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [prefilling, setPrefilling] = useState(false);
+
+  const isHrRep = roles.includes("hr_rep");
+  const isExisting = !!entity_id;
 
   const logRegisterEntity = (redirectTarget: string | null, reason: string) => {
     console.log("[RegisterEntity]", {
       pathname: location.pathname,
       userId: supabaseUser?.id ?? null,
-      role: roles[0] ?? null,
       roles,
       entity_id,
-      loading: {
-        authReady,
-        authLoading,
-        entityLoading,
-        submitting,
-      },
+      isExisting,
+      loading: { authReady, authLoading, entityLoading, submitting, prefilling },
       redirectTarget,
       reason,
     });
   };
 
-  const isHrRep = roles.includes("hr_rep");
-
-  useEffect(() => {
-    console.log("[RegisterEntity] AuthContext roles array on mount:", roles, "isHrRep:", isHrRep);
-    logRegisterEntity(null, "register-entity screen rendered");
-  }, [authLoading, authReady, entityLoading, entity_id, location.pathname, roles, submitting, supabaseUser?.id, isHrRep]);
-
+  // Access guard: only hr_rep
   useEffect(() => {
     if (!authReady || authLoading) return;
     if (!isHrRep) {
-      console.log("[RegisterEntity] Access denied — user is not hr_rep", { roles, redirectTarget: "/dashboard" });
+      console.log("[RegisterEntity] Access denied — user is not hr_rep", { roles });
       toast.error("Access denied: only HR Reps can register a company");
       navigate({ to: "/dashboard", replace: true });
     }
   }, [authReady, authLoading, isHrRep, roles, navigate]);
+
+  // Prepopulate from existing entity
+  useEffect(() => {
+    if (!entity_id) return;
+    setPrefilling(true);
+    supabase
+      .from("entities")
+      .select("id, name, industry")
+      .eq("id", entity_id)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) {
+          console.error("[RegisterEntity] Failed to load existing entity:", error);
+        } else if (data) {
+          setName(data.name ?? "");
+          setIndustry(data.industry ?? "");
+          logRegisterEntity(null, `prefilled form from existing entity ${data.id}`);
+        }
+        setPrefilling(false);
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entity_id]);
 
   if (authReady && !authLoading && !isHrRep) {
     return (
@@ -75,16 +90,42 @@ function RegisterEntityPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    logRegisterEntity(null, "submit requested");
-
     const parsed = schema.safeParse({ name, industry: industry || undefined });
     if (!parsed.success) {
-      logRegisterEntity(null, `validation failed: ${parsed.error.issues[0]?.message ?? "invalid input"}`);
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
 
     setSubmitting(true);
+
+    if (isExisting && entity_id) {
+      // UPDATE existing entity
+      const { data, error } = await supabase
+        .from("entities")
+        .update({
+          name: parsed.data.name,
+          industry: parsed.data.industry ?? null,
+        })
+        .eq("id", entity_id)
+        .select("id, name")
+        .single();
+      setSubmitting(false);
+
+      if (error || !data) {
+        console.error("[RegisterEntity] Update failed:", error);
+        logRegisterEntity(null, `entity update failed: ${error?.message ?? "unknown"}`);
+        toast.error(error?.message ?? "Failed to update company");
+        return;
+      }
+
+      setEntity(data.id, data.name);
+      logRegisterEntity("/org-departments", `entity updated (${data.id})`);
+      toast.success("Company details saved");
+      navigate({ to: "/org-departments", replace: true });
+      return;
+    }
+
+    // INSERT new entity
     const { data, error } = await supabase
       .from("entities")
       .insert({
@@ -98,16 +139,20 @@ function RegisterEntityPage() {
 
     if (error || !data) {
       console.error("[RegisterEntity] Insert failed:", error);
-      logRegisterEntity(null, `entity insert failed: ${error?.message ?? "unknown error"}`);
+      logRegisterEntity(null, `entity insert failed: ${error?.message ?? "unknown"}`);
       toast.error(error?.message ?? "Failed to register company");
       return;
     }
 
     setEntity(data.id, data.name);
-    logRegisterEntity("/org-departments", `entity created successfully (${data.id})`);
+    logRegisterEntity("/org-departments", `entity created (${data.id})`);
     toast.success("Company registered");
     navigate({ to: "/org-departments", replace: true });
   };
+
+  const submitLabel = submitting
+    ? isExisting ? "Saving..." : "Registering..."
+    : isExisting ? "Continue" : "Register Company";
 
   return (
     <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden bg-background p-6">
@@ -118,9 +163,13 @@ function RegisterEntityPage() {
         <CardHeader className="items-center space-y-4 text-center">
           <img src={bonusbridgeLogo} alt="BonusBridge" className="h-16 w-auto" />
           <div className="space-y-1">
-            <CardTitle className="text-2xl">Register your company</CardTitle>
+            <CardTitle className="text-2xl">
+              {isExisting ? "Confirm your company details" : "Register your company"}
+            </CardTitle>
             <CardDescription>
-              Create your organisation to begin setting up BonusBridge.
+              {isExisting
+                ? "Review and update your organisation details, then continue."
+                : "Create your organisation to begin setting up BonusBridge."}
             </CardDescription>
           </div>
         </CardHeader>
@@ -135,6 +184,7 @@ function RegisterEntityPage() {
                 required
                 maxLength={200}
                 placeholder="Acme Inc."
+                disabled={prefilling}
               />
             </div>
             <div className="space-y-2">
@@ -145,10 +195,11 @@ function RegisterEntityPage() {
                 onChange={(e) => setIndustry(e.target.value)}
                 maxLength={200}
                 placeholder="Technology Services, Financial Services, Manufacturing"
+                disabled={prefilling}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Registering..." : "Register Company"}
+            <Button type="submit" className="w-full" disabled={submitting || prefilling}>
+              {submitLabel}
             </Button>
           </form>
         </CardContent>

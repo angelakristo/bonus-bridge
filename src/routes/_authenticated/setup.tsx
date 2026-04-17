@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, Circle, Loader2, ArrowRight } from "lucide-react";
@@ -47,6 +47,7 @@ const ALLOWED_ROLES = ["ceo", "hr_rep"] as const;
 function SetupPage() {
   const { roles } = useAuth();
   const { entity_id } = useEntity();
+  const navigate = useNavigate();
   const [progress, setProgress] = useState<Record<string, SetupStepStatus>>({});
   const [loading, setLoading] = useState(true);
 
@@ -144,7 +145,13 @@ function SetupPage() {
                     <Button
                       variant={isComplete ? "outline" : "default"}
                       size="sm"
-                      onClick={() => toast("Coming soon", { description: `${step.title} screen is not built yet.` })}
+                      onClick={() => {
+                        if (step.key === "register_entity") {
+                          navigate({ to: "/register-entity" });
+                        } else {
+                          toast("Coming soon", { description: `${step.title} screen is not built yet.` });
+                        }
+                      }}
                     >
                       Go <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Button>

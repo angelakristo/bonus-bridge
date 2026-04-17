@@ -128,7 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSupabaseUser(mockSession.user);
     setPerson({
       id: "dev-preview-person",
-      entity_id: "dev-preview-entity",
+      entity_id: role === "hr_rep" ? null : "dev-preview-entity",
       first_name: "Preview",
       last_name: role.toUpperCase(),
     });

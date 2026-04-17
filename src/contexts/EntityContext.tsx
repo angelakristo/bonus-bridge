@@ -6,6 +6,7 @@ type EntityContextValue = {
   entity_id: string | null;
   entity_name: string | null;
   loading: boolean;
+  setEntity: (id: string, name: string | null) => void;
 };
 
 const EntityContext = createContext<EntityContextValue | undefined>(undefined);

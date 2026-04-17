@@ -1,10 +1,11 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, useNavigate, useLocation } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useEntity } from "@/contexts/EntityContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -21,14 +22,23 @@ const schema = z.object({
 });
 
 function RegisterEntityPage() {
-  const { setEntity } = useEntity();
+  const { setEntity, entity_id } = useEntity();
+  const { supabaseUser, roles } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
+
+    console.log("[RegisterEntity] Submit", {
+      userId: supabaseUser?.id,
+      roles,
+      entity_id,
+      pathname: location.pathname,
+    });
 
     const parsed = schema.safeParse({ name, industry: industry || undefined });
     if (!parsed.success) {
@@ -39,19 +49,25 @@ function RegisterEntityPage() {
     setSubmitting(true);
     const { data, error } = await supabase
       .from("entities")
-      .insert({ name: parsed.data.name, industry: parsed.data.industry ?? null })
+      .insert({
+        name: parsed.data.name,
+        industry: parsed.data.industry ?? null,
+        created_at: new Date().toISOString(),
+      })
       .select("id, name")
       .single();
     setSubmitting(false);
 
     if (error || !data) {
+      console.error("[RegisterEntity] Insert failed:", error);
       toast.error(error?.message ?? "Failed to register company");
       return;
     }
 
+    console.log("[RegisterEntity] Success → /org-departments", { newEntityId: data.id });
     setEntity(data.id, data.name);
     toast.success("Company registered");
-    navigate({ to: "/setup" });
+    navigate({ to: "/org-departments", replace: true });
   };
 
   return (

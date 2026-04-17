@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
@@ -18,6 +18,8 @@ type AuthContextValue = {
   person: Person | null;
   roles: UserRole[];
   loading: boolean;
+  /** True once the initial session + person + roles resolution has completed. */
+  ready: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   devPreviewSignIn: (role: UserRole) => void;
@@ -31,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [person, setPerson] = useState<Person | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [ready, setReady] = useState(false);
+  const devPreviewActiveRef = useRef(false);
 
   const loadPersonAndRoles = async (userId: string) => {
     const { data: personData, error: personError } = await supabase
@@ -40,7 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (personError || !personData) {
-      console.error("Failed to load person:", personError);
+      if (personError) console.error("[Auth] Failed to load person:", personError);
       setPerson(null);
       setRoles([]);
       return;
@@ -54,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("person_id", personData.id);
 
     if (rolesError) {
-      console.error("Failed to load roles:", rolesError);
+      console.error("[Auth] Failed to load roles:", rolesError);
       setRoles([]);
       return;
     }
@@ -62,39 +66,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoles(rolesData?.map((r) => r.role) ?? []);
   };
 
+  const resolveSession = async (newSession: Session | null) => {
+    setSession(newSession);
+    setSupabaseUser(newSession?.user ?? null);
+
+    if (!newSession?.user) {
+      setPerson(null);
+      setRoles([]);
+      console.log("[Auth] No session — user signed out or not signed in.");
+      return;
+    }
+
+    console.log("[Auth] Resolving session for user:", newSession.user.id);
+    await loadPersonAndRoles(newSession.user.id);
+  };
+
   useEffect(() => {
+    let cancelled = false;
+
     // Set up auth listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      setSession(newSession);
-      setSupabaseUser(newSession?.user ?? null);
-
-      if (event === "SIGNED_OUT" || !newSession?.user) {
-        setPerson(null);
-        setRoles([]);
-        setLoading(false);
-        return;
-      }
-
+      if (devPreviewActiveRef.current) return; // ignore real auth events while dev preview is active
       // Defer Supabase calls to avoid deadlock inside the callback
       setTimeout(() => {
-        loadPersonAndRoles(newSession.user.id).finally(() => setLoading(false));
+        if (cancelled) return;
+        resolveSession(newSession).finally(() => {
+          if (cancelled) return;
+          setLoading(false);
+          setReady(true);
+          console.log("[Auth] Ready (event:", event, ")");
+        });
       }, 0);
     });
 
-    // THEN check existing session
+    // THEN check existing session (single source of bootstrap completion)
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      setSession(existingSession);
-      setSupabaseUser(existingSession?.user ?? null);
-
-      if (!existingSession?.user) {
+      if (cancelled || devPreviewActiveRef.current) return;
+      resolveSession(existingSession).finally(() => {
+        if (cancelled) return;
         setLoading(false);
-        return;
-      }
-
-      loadPersonAndRoles(existingSession.user.id).finally(() => setLoading(false));
+        setReady(true);
+        console.log("[Auth] Ready (bootstrap)");
+      });
     });
 
     return () => {
+      cancelled = true;
       subscription.unsubscribe();
     };
   }, []);
@@ -105,6 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signOut = async () => {
+    devPreviewActiveRef.current = false;
     await supabase.auth.signOut();
     setSession(null);
     setSupabaseUser(null);
@@ -113,8 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const devPreviewSignIn = (role: UserRole) => {
-    // Dev-only: injects an in-memory mock session so protected screens render.
-    // No Supabase writes; queries depending on a real auth user will return empty.
+    devPreviewActiveRef.current = true;
     const mockUserId = "dev-preview-user";
     const mockSession = {
       access_token: "dev-preview",
@@ -134,11 +151,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     setRoles([role]);
     setLoading(false);
+    setReady(true);
+    console.log("[Auth] Dev preview sign-in as", role);
   };
 
   return (
     <AuthContext.Provider
-      value={{ session, supabaseUser, person, roles, loading, signIn, signOut, devPreviewSignIn }}
+      value={{ session, supabaseUser, person, roles, loading, ready, signIn, signOut, devPreviewSignIn }}
     >
       {children}
     </AuthContext.Provider>

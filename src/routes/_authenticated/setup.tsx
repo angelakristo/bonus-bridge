@@ -145,7 +145,13 @@ function SetupPage() {
                     <Button
                       variant={isComplete ? "outline" : "default"}
                       size="sm"
-                      onClick={() => toast("Coming soon", { description: `${step.title} screen is not built yet.` })}
+                      onClick={() => {
+                        if (step.key === "register_entity") {
+                          navigate({ to: "/register-entity" });
+                        } else {
+                          toast("Coming soon", { description: `${step.title} screen is not built yet.` });
+                        }
+                      }}
                     >
                       Go <ArrowRight className="ml-1 h-3.5 w-3.5" />
                     </Button>

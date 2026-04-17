@@ -7,7 +7,7 @@ type UserRole = Database["public"]["Enums"]["user_role"];
 
 export type Person = {
   id: string;
-  entity_id: string;
+  entity_id: string | null;
   first_name: string;
   last_name: string;
 };

@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate, useLocation } from "@tanstack/react-router";
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { z } from "zod";
 
@@ -22,26 +22,44 @@ const schema = z.object({
 });
 
 function RegisterEntityPage() {
-  const { setEntity, entity_id } = useEntity();
-  const { supabaseUser, roles } = useAuth();
+  const { setEntity, entity_id, loading: entityLoading } = useEntity();
+  const { supabaseUser, roles, ready: authReady, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [name, setName] = useState("");
   const [industry, setIndustry] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const logRegisterEntity = (redirectTarget: string | null, reason: string) => {
+    console.log("[RegisterEntity]", {
+      pathname: location.pathname,
+      userId: supabaseUser?.id ?? null,
+      role: roles[0] ?? null,
+      roles,
+      entity_id,
+      loading: {
+        authReady,
+        authLoading,
+        entityLoading,
+        submitting,
+      },
+      redirectTarget,
+      reason,
+    });
+  };
+
+  useEffect(() => {
+    logRegisterEntity(null, "register-entity screen rendered");
+  }, [authLoading, authReady, entityLoading, entity_id, location.pathname, roles, submitting, supabaseUser?.id]);
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
 
-    console.log("[RegisterEntity] Submit", {
-      userId: supabaseUser?.id,
-      roles,
-      entity_id,
-      pathname: location.pathname,
-    });
+    logRegisterEntity(null, "submit requested");
 
     const parsed = schema.safeParse({ name, industry: industry || undefined });
     if (!parsed.success) {
+      logRegisterEntity(null, `validation failed: ${parsed.error.issues[0]?.message ?? "invalid input"}`);
       toast.error(parsed.error.issues[0]?.message ?? "Invalid input");
       return;
     }
@@ -60,12 +78,13 @@ function RegisterEntityPage() {
 
     if (error || !data) {
       console.error("[RegisterEntity] Insert failed:", error);
+      logRegisterEntity(null, `entity insert failed: ${error?.message ?? "unknown error"}`);
       toast.error(error?.message ?? "Failed to register company");
       return;
     }
 
-    console.log("[RegisterEntity] Success → /org-departments", { newEntityId: data.id });
     setEntity(data.id, data.name);
+    logRegisterEntity("/org-departments", `entity created successfully (${data.id})`);
     toast.success("Company registered");
     navigate({ to: "/org-departments", replace: true });
   };

@@ -1,74 +1,56 @@
 
-Why it does not work now:
+Goal: HR Rep can log in → Dashboard → Setup Checklist → click "Go" on Register Entity → land on `/register-entity` (no redirect bounce) → see form prepopulated from existing entity (if any) → click Continue → go to `/org-departments`.
 
-1. The screen itself already exists and the submit logic is basically correct. The failure is in the onboarding state model + redirect flow around it.
+## Root cause of the current bounce
 
-2. There are two separate problems:
-- Redirect churn:
-  - `src/routes/login.tsx` sends a signed-in/preview user to `/`
-  - `src/routes/index.tsx` immediately sends any session to `/dashboard`
-  - `_authenticated.tsx` then tries to send `hr_rep` users without an entity to `/register-entity`
-  - That means the app is bouncing between routes instead of choosing the onboarding route once.
-- Schema/state mismatch:
-  - `EntityContext` derives `entity_id` from `person.entity_id`
-  - In your actual schema, `people.entity_id` is `NOT NULL`
-  - So a real database-backed user cannot truly be `hr_rep` with `entity_id = null` in `people`
-  - That means the condition from the prompt is only naturally reachable in preview/mock state, not through the current persisted profile shape
+In `src/routes/_authenticated.tsx` there is this redirect:
 
-3. There is also a persistence gap:
-- `/register-entity` inserts into `entities` and updates `EntityContext` locally
-- but it does not write the new `entity_id` back to the user’s existing `people` row
-- so even if the current session moves forward, a later re-hydration can fall out of sync
+```ts
+if (isHrRep && entity_id && onRegisterEntity) {
+  navigate({ to: "/org-departments", replace: true });
+}
+```
 
-Can I fix it?
-- Yes, I can fix the redirect race in code.
-- I can also make the onboarding route become the single source of truth for preview/onboarding flow.
-- But for real authenticated users, the exact state “`hr_rep` + no `entity_id` in `EntityContext` because profile has none” conflicts with the current `people.entity_id NOT NULL` schema, so that part is not just a UI bug.
+Because Angela's `people.entity_id` is non-null (DB requires it), `entity_id` is always set, so the moment she lands on `/register-entity` this guard fires and ejects her to `/org-departments`. That is the redirect she's seeing.
 
-What I would change:
+The page-level guard in `register-entity.tsx` also requires `hr_rep` and is fine, but the layout-level eject runs first.
 
-1. `src/routes/login.tsx`
-- Stop blindly sending every successful sign-in/preview to `/`
-- After auth resolves, choose the destination once:
-  - `hr_rep` + no entity => `/register-entity`
-  - otherwise normal app route
-- This removes the first bounce
+## Fix plan (4 small edits, no DB changes)
 
-2. `src/routes/index.tsx`
-- Remove the unconditional “session => `/dashboard`” redirect
-- Make `/` respect onboarding state instead of forcing dashboard first
-- This removes the second bounce
+### 1. `src/routes/_authenticated.tsx` — remove the auto-eject from `/register-entity`
+- Keep: redirect to `/login` if no session.
+- Keep: redirect HR Rep with NO entity to `/register-entity` (covers the "true onboarding" case if it ever arises).
+- REMOVE: the `isHrRep && entity_id && onRegisterEntity → /org-departments` block. Navigation away from `/register-entity` should only happen when the user clicks Continue, never automatically.
+- Remove the `shouldHoldRegisterEntity` special-case (no longer needed) and let `/register-entity` render inside the normal auth-resolved flow without the AppShell.
 
-3. `src/routes/_authenticated.tsx`
-- Keep one guarded redirect effect only
-- Do nothing until auth, roles/person, and entity are all resolved
-- If `hr_rep` and no entity:
-  - already on `/register-entity` => stay there
-  - not on `/register-entity` => send there
-- Only leave `/register-entity` after `EntityContext` has a real id
+### 2. `src/routes/_authenticated/register-entity.tsx` — make it work for both new and existing entities
+- Keep `hr_rep` gate.
+- On mount, if `entity_id` already exists, fetch that entity row (`id, name, industry`) from `entities` and prepopulate the form fields.
+- Submit logic becomes:
+  - If no existing `entity_id`: INSERT into `entities`, then `setEntity(...)`, then navigate to `/org-departments`.
+  - If existing `entity_id`: UPDATE the existing entity row with the (possibly edited) name/industry, then `setEntity(...)`, then navigate to `/org-departments`.
+- Button label: "Register Company" when creating, "Continue" when an entity already exists.
+- Keep temporary console logs for now.
 
-4. `src/contexts/AuthContext.tsx`
-- Ensure auth bootstrap resolves once without late stale updates overriding route decisions
-- Keep the temporary console logs here
+### 3. `src/routes/_authenticated/setup.tsx` — wire the "Go" button for Register Entity
+- For the `register_entity` step, change the button `onClick` from the "coming soon" toast to `navigate({ to: "/register-entity" })`.
+- Leave the other steps as "coming soon" for now.
 
-5. `src/contexts/EntityContext.tsx`
-- Do not clear entity state until auth/profile resolution is truly finished
-- Preserve the manual `setEntity` override after registration so the success navigation is not undone
+### 4. `src/routes/index.tsx` and `src/routes/login.tsx` — confirm post-login destination is `/dashboard`
+- Verify the post-auth redirect for an HR Rep WITH an entity goes to `/dashboard` (not `/org-departments` or `/register-entity`). Adjust the guarded effect if needed so the success criterion "logged in → dashboard" holds.
 
-6. `src/routes/_authenticated/register-entity.tsx`
-- Keep the existing `entities` insert
-- Keep `setEntity(returnedId, returnedName)`
-- Keep navigation to `/org-departments`
-- Keep temporary console logs
+## Files touched
+- `src/routes/_authenticated.tsx` (remove auto-eject)
+- `src/routes/_authenticated/register-entity.tsx` (prepopulate + update path)
+- `src/routes/_authenticated/setup.tsx` (wire Go button)
+- `src/routes/index.tsx` and/or `src/routes/login.tsx` (ensure default lands on `/dashboard`)
 
-Important limitation to be aware of:
-- Even after the redirect fix, a real DB-backed `hr_rep` with `people.entity_id = null` is not representable with the current schema you shared.
-- So I can fix the route race, but if you want this to work for real signed-in users rather than preview/mock users, the current persisted onboarding state does not fully line up with the requirement.
+## What I am NOT doing
+- No DB schema changes (per workspace rule).
+- No new tables.
+- No changes to `AuthContext` / `EntityContext` logic — they are already correct; the bug is purely the layout-level eject.
 
-Files I would audit/update for the actual fix:
-- `src/routes/login.tsx`
-- `src/routes/index.tsx`
-- `src/routes/_authenticated.tsx`
-- `src/contexts/AuthContext.tsx`
-- `src/contexts/EntityContext.tsx`
-- `src/routes/_authenticated/register-entity.tsx`
+## Expected result
+- Login as Angela (hr_rep, has entity) → `/dashboard`.
+- Open `/setup` → click "Go" on Register Entity → `/register-entity` loads and STAYS, prepopulated with her entity name + industry.
+- Click "Continue" → entity row updated → navigates to `/org-departments`.

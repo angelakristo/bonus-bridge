@@ -10,7 +10,7 @@ export const Route = createFileRoute("/_authenticated")({
 });
 
 function AuthenticatedLayout() {
-  const { session, ready: authReady, roles, supabaseUser } = useAuth();
+  const { session, ready: authReady, loading: authLoading, roles, supabaseUser, person } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,59 +18,59 @@ function AuthenticatedLayout() {
   const onRegisterEntity = location.pathname === "/register-entity";
   const isHrRep = roles.includes("hr_rep");
   const needsEntityRegistration = isHrRep && !entity_id;
+  const shouldHoldRegisterEntity = onRegisterEntity && !!session && (!authReady || authLoading || entityLoading);
+
+  const logGuard = (redirectTarget: string | null, reason: string) => {
+    console.log("[Guard]", {
+      pathname: location.pathname,
+      userId: supabaseUser?.id ?? session?.user?.id ?? null,
+      role: roles[0] ?? null,
+      roles,
+      entity_id,
+      loading: {
+        authReady,
+        authLoading,
+        entityLoading,
+        personResolved: authReady,
+      },
+      redirectTarget,
+      reason,
+    });
+  };
 
   useEffect(() => {
-    // Hold all redirects until auth + entity have fully resolved.
-    if (!authReady || entityLoading) {
-      console.log("[Guard] Waiting…", {
-        authReady,
-        entityLoading,
-        pathname: location.pathname,
-      });
+    if (!authReady || authLoading || entityLoading) {
+      logGuard(null, "waiting for auth, role, person, and entity resolution before redirect decisions");
       return;
     }
 
-    // 1. Not signed in → login
     if (!session) {
-      console.log("[Guard] Redirect → /login (no session)", { pathname: location.pathname });
+      logGuard("/login", "no authenticated session");
       navigate({ to: "/login", replace: true });
       return;
     }
 
-    // 2. hr_rep with no entity → must be on /register-entity
     if (needsEntityRegistration && !onRegisterEntity) {
-      console.log("[Guard] Redirect → /register-entity", {
-        userId: supabaseUser?.id,
-        roles,
-        entity_id,
-        pathname: location.pathname,
-        reason: "hr_rep without entity_id",
-      });
+      logGuard("/register-entity", "hr_rep resolved without entity_id, onboarding required");
       navigate({ to: "/register-entity", replace: true });
       return;
     }
 
-    // 3. User has entity but is sitting on /register-entity → send to app
-    if (!needsEntityRegistration && entity_id && onRegisterEntity) {
-      console.log("[Guard] Redirect → /org-departments", {
-        userId: supabaseUser?.id,
-        roles,
-        entity_id,
-        pathname: location.pathname,
-        reason: "registration already complete",
-      });
+    if (needsEntityRegistration && onRegisterEntity) {
+      logGuard(null, "hr_rep without entity_id already on /register-entity, staying on onboarding screen");
+      return;
+    }
+
+    if (isHrRep && entity_id && onRegisterEntity) {
+      logGuard("/org-departments", "registration complete, leaving onboarding screen");
       navigate({ to: "/org-departments", replace: true });
       return;
     }
 
-    console.log("[Guard] Stay", {
-      userId: supabaseUser?.id,
-      roles,
-      entity_id,
-      pathname: location.pathname,
-    });
+    logGuard(null, person ? "stay on requested authenticated route" : "stay on requested route with resolved missing person profile");
   }, [
     authReady,
+    authLoading,
     entityLoading,
     session,
     needsEntityRegistration,
@@ -80,9 +80,16 @@ function AuthenticatedLayout() {
     navigate,
     roles,
     supabaseUser?.id,
+    isHrRep,
+    person,
   ]);
 
-  if (!authReady || entityLoading || !session) {
+  if (shouldHoldRegisterEntity) {
+    logGuard(null, "rendering /register-entity while auth or entity state finishes resolving");
+    return <Outlet />;
+  }
+
+  if (!authReady || authLoading || entityLoading || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Loading...</p>

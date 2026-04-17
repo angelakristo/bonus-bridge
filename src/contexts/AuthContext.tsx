@@ -25,7 +25,14 @@ type AuthContextValue = {
   devPreviewSignIn: (role: UserRole) => void;
 };
 
+type HydratedAuthState = {
+  person: Person | null;
+  roles: UserRole[];
+};
+
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+const getCurrentPathname = () => (typeof window !== "undefined" ? window.location.pathname : "server");
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -35,22 +42,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
   const devPreviewActiveRef = useRef(false);
+  const resolutionIdRef = useRef(0);
 
-  const loadPersonAndRoles = async (userId: string) => {
+  const loadPersonAndRoles = async (userId: string): Promise<HydratedAuthState> => {
     const { data: personData, error: personError } = await supabase
       .from("people")
       .select("id, entity_id, first_name, last_name")
       .eq("auth_user_id", userId)
       .maybeSingle();
 
-    if (personError || !personData) {
-      if (personError) console.error("[Auth] Failed to load person:", personError);
-      setPerson(null);
-      setRoles([]);
-      return;
+    if (personError) {
+      console.error("[Auth] Failed to load person:", personError);
+      return { person: null, roles: [] };
     }
 
-    setPerson(personData);
+    if (!personData) {
+      return { person: null, roles: [] };
+    }
 
     const { data: rolesData, error: rolesError } = await supabase
       .from("people_roles")
@@ -59,55 +67,102 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (rolesError) {
       console.error("[Auth] Failed to load roles:", rolesError);
-      setRoles([]);
-      return;
+      return { person: personData, roles: [] };
     }
 
-    setRoles(rolesData?.map((r) => r.role) ?? []);
+    return {
+      person: personData,
+      roles: rolesData?.map((record) => record.role) ?? [],
+    };
   };
 
-  const resolveSession = async (newSession: Session | null) => {
+  const resolveSession = async (newSession: Session | null, source: string) => {
+    const resolutionId = ++resolutionIdRef.current;
+
+    setLoading(true);
+    setReady(false);
     setSession(newSession);
     setSupabaseUser(newSession?.user ?? null);
 
     if (!newSession?.user) {
+      if (resolutionId !== resolutionIdRef.current) return;
       setPerson(null);
       setRoles([]);
-      console.log("[Auth] No session — user signed out or not signed in.");
+      setLoading(false);
+      setReady(true);
+      console.log("[Auth] Resolved", {
+        pathname: getCurrentPathname(),
+        userId: null,
+        role: null,
+        roles: [],
+        entity_id: null,
+        loading: { authLoading: false, authReady: true },
+        redirectTarget: null,
+        reason: `auth resolved without session from ${source}`,
+      });
       return;
     }
 
-    console.log("[Auth] Resolving session for user:", newSession.user.id);
-    await loadPersonAndRoles(newSession.user.id);
+    console.log("[Auth] Resolving session", {
+      pathname: getCurrentPathname(),
+      userId: newSession.user.id,
+      role: null,
+      roles: [],
+      entity_id: null,
+      loading: { authLoading: true, authReady: false },
+      redirectTarget: null,
+      reason: `hydrating auth state from ${source}`,
+    });
+
+    const hydrated = await loadPersonAndRoles(newSession.user.id);
+
+    if (resolutionId !== resolutionIdRef.current) {
+      console.log("[Auth] Ignored stale resolution", {
+        pathname: getCurrentPathname(),
+        userId: newSession.user.id,
+        role: hydrated.roles[0] ?? null,
+        roles: hydrated.roles,
+        entity_id: hydrated.person?.entity_id ?? null,
+        loading: { authLoading: true, authReady: false },
+        redirectTarget: null,
+        reason: `stale auth resolution from ${source}`,
+      });
+      return;
+    }
+
+    setPerson(hydrated.person);
+    setRoles(hydrated.roles);
+    setLoading(false);
+    setReady(true);
+
+    console.log("[Auth] Resolved", {
+      pathname: getCurrentPathname(),
+      userId: newSession.user.id,
+      role: hydrated.roles[0] ?? null,
+      roles: hydrated.roles,
+      entity_id: hydrated.person?.entity_id ?? null,
+      loading: { authLoading: false, authReady: true },
+      redirectTarget: null,
+      reason: `auth resolved from ${source}`,
+    });
   };
 
   useEffect(() => {
     let cancelled = false;
 
-    // Set up auth listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (devPreviewActiveRef.current) return; // ignore real auth events while dev preview is active
-      // Defer Supabase calls to avoid deadlock inside the callback
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (devPreviewActiveRef.current) return;
       setTimeout(() => {
         if (cancelled) return;
-        resolveSession(newSession).finally(() => {
-          if (cancelled) return;
-          setLoading(false);
-          setReady(true);
-          console.log("[Auth] Ready (event:", event, ")");
-        });
+        void resolveSession(newSession, `auth event:${event}`);
       }, 0);
     });
 
-    // THEN check existing session (single source of bootstrap completion)
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
       if (cancelled || devPreviewActiveRef.current) return;
-      resolveSession(existingSession).finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-        setReady(true);
-        console.log("[Auth] Ready (bootstrap)");
-      });
+      void resolveSession(existingSession, "bootstrap");
     });
 
     return () => {
@@ -123,11 +178,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = async () => {
     devPreviewActiveRef.current = false;
+    setLoading(true);
+    setReady(false);
     await supabase.auth.signOut();
     setSession(null);
     setSupabaseUser(null);
     setPerson(null);
     setRoles([]);
+    setLoading(false);
+    setReady(true);
+    console.log("[Auth] Signed out", {
+      pathname: getCurrentPathname(),
+      userId: null,
+      role: null,
+      roles: [],
+      entity_id: null,
+      loading: { authLoading: false, authReady: true },
+      redirectTarget: "/login",
+      reason: "explicit sign out",
+    });
   };
 
   const devPreviewSignIn = (role: UserRole) => {
@@ -141,6 +210,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token_type: "bearer",
       user: { id: mockUserId, email: `${role}@preview.local` } as User,
     } as unknown as Session;
+    resolutionIdRef.current += 1;
     setSession(mockSession);
     setSupabaseUser(mockSession.user);
     setPerson({
@@ -152,7 +222,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setRoles([role]);
     setLoading(false);
     setReady(true);
-    console.log("[Auth] Dev preview sign-in as", role);
+    console.log("[Auth] Dev preview sign-in", {
+      pathname: getCurrentPathname(),
+      userId: mockUserId,
+      role,
+      roles: [role],
+      entity_id: role === "hr_rep" ? null : "dev-preview-entity",
+      loading: { authLoading: false, authReady: true },
+      redirectTarget: "/",
+      reason: "manual dev preview sign-in",
+    });
   };
 
   return (

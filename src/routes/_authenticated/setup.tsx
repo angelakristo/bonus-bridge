@@ -47,6 +47,7 @@ const ALLOWED_ROLES = ["ceo", "hr_rep"] as const;
 function SetupPage() {
   const { roles } = useAuth();
   const { entity_id } = useEntity();
+  const navigate = useNavigate();
   const [progress, setProgress] = useState<Record<string, SetupStepStatus>>({});
   const [loading, setLoading] = useState(true);
 

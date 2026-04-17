@@ -23,7 +23,8 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
-  const { session, signIn, devPreviewSignIn, loading } = useAuth();
+  const { session, ready: authReady, loading: authLoading, roles, signIn, devPreviewSignIn } = useAuth();
+  const { entity_id, loading: entityLoading } = useEntity();
   const navigate = useNavigate();
   const search = Route.useSearch();
 
@@ -32,10 +33,25 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!loading && session) {
-      navigate({ to: search.redirect ?? "/" });
+    if (!authReady || authLoading || entityLoading) return;
+    if (!session) return;
+
+    if (search.redirect) {
+      console.log("[Login]", { reason: "explicit redirect target", redirectTarget: search.redirect });
+      navigate({ to: search.redirect, replace: true });
+      return;
     }
-  }, [loading, session, navigate, search.redirect]);
+
+    const isHrRep = roles.includes("hr_rep");
+    if (isHrRep && !entity_id) {
+      console.log("[Login]", { reason: "hr_rep without entity", redirectTarget: "/register-entity", roles, entity_id });
+      navigate({ to: "/register-entity", replace: true });
+      return;
+    }
+
+    console.log("[Login]", { reason: "authenticated with entity", redirectTarget: "/dashboard", roles, entity_id });
+    navigate({ to: "/dashboard", replace: true });
+  }, [authReady, authLoading, entityLoading, session, roles, entity_id, navigate, search.redirect]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -49,13 +65,13 @@ function LoginPage() {
     }
 
     toast.success("Signed in");
-    navigate({ to: search.redirect ?? "/" });
+    // Navigation handled by the effect above once auth + entity resolve.
   };
 
   const handlePreview = (role: "ceo" | "hr_rep" | "manager" | "employee") => {
     devPreviewSignIn(role);
     toast.success(`Preview mode: ${role.toUpperCase()}`);
-    navigate({ to: search.redirect ?? "/" });
+    // Navigation handled by the effect above once auth + entity resolve.
   };
 
   return (

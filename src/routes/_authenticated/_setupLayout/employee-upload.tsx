@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx-js-style";
-import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";

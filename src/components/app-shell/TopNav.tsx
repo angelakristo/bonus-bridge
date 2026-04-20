@@ -1,4 +1,6 @@
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+
+import { ActionCentre } from "@/components/app-shell/ActionCentre";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useYear } from "@/contexts/YearContext";
@@ -72,17 +74,7 @@ export function TopNav({ notificationCount = 0 }: TopNavProps) {
           </span>
         )}
 
-        <Button variant="ghost" size="icon" className="relative rounded-full" aria-label="Action centre">
-          <Bell className="h-5 w-5" />
-          {notificationCount > 0 && (
-            <Badge
-              variant="destructive"
-              className="absolute -right-0.5 -top-0.5 h-5 min-w-5 justify-center rounded-full px-1 text-[10px]"
-            >
-              {notificationCount}
-            </Badge>
-          )}
-        </Button>
+        <ActionCentre />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

@@ -445,7 +445,35 @@ function EmployeeUploadPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Or — Add Employees Manually</CardTitle>
+          <CardDescription>
+            Prefer to enter employees one at a time? Add them through a quick form
+            instead of using the Excel template.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            onClick={() => setManualOpen(true)}
+            disabled={!entityReady || !person?.id}
+          >
+            <UserPlus className="h-4 w-4" />
+            Add Employee Manually
+          </Button>
+        </CardContent>
+      </Card>
+
       <UploadValidationModal open={modalOpen} onOpenChange={setModalOpen} errors={errors} />
+      {entity_id && person?.id && (
+        <AddEmployeeManuallyModal
+          open={manualOpen}
+          onOpenChange={setManualOpen}
+          entityId={entity_id}
+          uploaderPersonId={person.id}
+        />
+      )}
     </div>
   );
 }

@@ -199,9 +199,9 @@ export function ActionCentre() {
               {employeeItems.map((item) => (
                 <li key={item.individual_kpi_id} className="flex items-start gap-3 p-3">
                   {item.status === "approved" ? (
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-green-600" />
+                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
                   ) : (
-                    <X className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                    <X className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
                   )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{item.kpi_title}</p>

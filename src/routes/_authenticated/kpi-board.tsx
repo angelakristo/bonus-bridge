@@ -539,6 +539,9 @@ function KpiBoardPage() {
 
   if (!allowed) return null;
 
+  const corpAtLimit = corpKpis.length >= MAX_KPIS_PER_BOARD;
+  const deptAtLimit = deptKpis.length >= MAX_KPIS_PER_BOARD;
+
   /* ---- sortable id lists ---- */
   const libIds = library.map((k) => `${LIB_PREFIX}${k.id}`);
   const corpIds = corpKpis.map((k) => `${CORP_PREFIX}${k.id}`);

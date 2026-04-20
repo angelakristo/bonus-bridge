@@ -12,6 +12,7 @@ import { commitEmployeeUpload } from "@/integrations/supabase/employee-upload.fu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadValidationModal } from "@/components/employee-upload/UploadValidationModal";
+import { AddEmployeeManuallyModal } from "@/components/employee-upload/AddEmployeeManuallyModal";
 
 export const Route = createFileRoute("/_authenticated/_setupLayout/employee-upload")({
   component: EmployeeUploadPage,

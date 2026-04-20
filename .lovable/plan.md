@@ -1,73 +1,86 @@
 
 ## Goal
-Add Step 2 to the Employee Upload screen: a `.xlsx` file picker + Upload button that parses the file, runs all 7 validations across all rows, collects errors, and opens an Upload Validation Modal listing them. No inserts in this step.
+Refactor the setup flow so every setup screen (`/register-entity`, `/org-departments`, `/employee-upload`, plus future ones) renders inside the standard AppShell with a persistent **Setup Checklist sidebar on the left side of the page content**. Completed steps show a green tick instead of an enumerated number. The TopNav (logout, etc.) and main app sidebar stay visible at all times.
 
 ## Files touched
 
-### 1. `src/routes/_authenticated/employee-upload.tsx` (edit)
-Replace the "Step 2 — Upload File / Coming soon" placeholder card with a working Step 2 section:
-- Hidden `<input type="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet">` triggered by a styled "Choose file" button (shadcn `Button` + `Input`).
-- Display the selected file name once chosen.
-- "Upload" button — disabled until a file is selected; shows a loading state during parse + validation.
-- On click → `handleUpload()`:
-  1. Read the file as ArrayBuffer.
-  2. `XLSX.read` → take sheet `Employees` (fallback to first sheet).
-  3. `XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: "" })` → 2D array.
-  4. Treat row 0 as header; map column indexes to the 9 known field names. Skip the optional example row only if its first cell exactly equals `EMP001` AND first_name `Jane` AND email `jane.smith@company.com` (template artifact). All other rows are data.
-  5. Skip fully blank rows.
-  6. Run validations (below) against `useEntity().entity_id`.
-  7. If `errors.length > 0` → open `UploadValidationModal`. Else → toast "All rows valid — insert step coming soon" (no DB writes per task scope).
+### 1. New: `src/components/setup/steps.ts`
+Extract the `STEPS` array from `setup.tsx` into a shared source of truth, adding a `route?: string` field per step:
+```ts
+export type SetupStep = { key: string; title: string; description: string; route?: string };
+export const STEPS: SetupStep[] = [
+  { key: "register_entity", title: "Register Entity", route: "/register-entity", ... },
+  { key: "build_org_departments", title: "Build Org Departments", route: "/org-departments", ... },
+  { key: "upload_employees", title: "Upload Employees", route: "/employee-upload", ... },
+  { key: "assign_roles", title: "Assign Roles", ... },     // no route yet
+  ...
+];
+```
 
-### 2. Validation logic (inline helpers in the same file)
-For each data row (1-indexed for user display, where row 1 = first data row under headers):
+### 2. New: `src/components/setup/SetupChecklist.tsx`
+Vertical checklist rendered as the LHS column inside the setup layout:
+- Green `CheckCircle2` icon when complete; otherwise the enumerated number in a circle.
+- Active step (matching current pathname) gets `bg-accent/40` highlight + bold.
+- Each row is a `<Link>` to its `route`. Completed steps remain clickable (so the user can revisit `/register-entity` even when already registered, per spec).
+- Steps without a route render disabled with a "Coming soon" hint.
+- Props: `progress: Record<string, SetupStepStatus>`, `loading: boolean`.
 
-1. **Required fields**: `first_name`, `last_name`, `email`, `org_department`, `functional_department`, `role` — push `{ row, field, error: "Required field missing: <field>" }` for each empty/whitespace-only.
-2. **Duplicate email** (entity-scoped): batch one query up-front —
-   ```ts
-   supabase.from("people").select("email").eq("entity_id", entity_id).in("email", emails)
-   ```
-   Build a `Set<string>` of existing emails (lowercased, trimmed). For each row whose email is in the set → `{ row, field: "email", error: "Duplicate email" }`. Also flag in-file duplicates (same email appearing twice in the upload).
-3. **Org department exists**: batch fetch —
-   ```ts
-   supabase.from("organisational_departments").select("name").eq("entity_id", entity_id)
-   ```
-   Build `Set<string>` of names. For each row whose `org_department` value is non-empty and not in the set → `{ row, field: "org_department", error: "Org department not found: <value>" }`.
-4. **Functional department exists**: batch fetch —
-   ```ts
-   supabase.from("functional_departments").select("name")
-   ```
-   (no entity scope per current schema). Same membership check → `{ row, field: "functional_department", error: "Functional department not found: <value>" }`.
-5. **Salary numeric (if provided)**: if `annual_salary` is non-empty and `Number.isFinite(Number(value))` is false → `{ row, field: "annual_salary", error: "Salary must be a number" }`.
-6. **Date valid (if provided)**: if `employment_start_date` non-empty, require strict `YYYY-MM-DD` regex AND a valid `Date` parse → `{ row, field: "employment_start_date", error: "Invalid date format, use YYYY-MM-DD" }`. SheetJS may return a JS `Date` for date-typed cells — accept that too and reformat to `YYYY-MM-DD`.
-7. **Role enum**: trim + lowercase; must be one of `ceo`, `manager`, `hr_rep`, `employee` → otherwise `{ row, field: "role", error: "Invalid role value" }`.
+### 3. New: `src/routes/_authenticated/_setup.tsx` (pathless layout route)
+Wraps any child route under it with a 2-column grid:
+- LHS (`w-72 shrink-0`): `<SetupChecklist progress={...} />`
+- RHS (`flex-1`): `<Outlet />`
 
-Order is preserved per row (validation 1 → 7), and within validation 1 the field order is the spec order. All rows fully validated before any UI is shown.
+Logic:
+- `useAuth()`: only `hr_rep` / `ceo` allowed; otherwise render existing "Access denied" card and skip the checklist (no info leak).
+- `useEntity()` for `entity_id`. If null we still render the layout, but only `register_entity` is enabled in the checklist.
+- Single `Promise.all` batch (when `entity_id` exists):
+  - `setup_progress.select("step_key, status").eq("entity_id", entity_id)` — fallback for steps without a screen
+  - `organisational_departments.select("id", { head: true, count: "exact" }).eq("entity_id", entity_id)`
+  - `people.select("id", { head: true, count: "exact" }).eq("entity_id", entity_id)`
+- Derived auto-completion:
+  - `register_entity` → complete iff `entity_id` is non-null
+  - `build_org_departments` → complete iff org-dept count > 0
+  - `upload_employees` → complete iff people count > 0
+  - All other keys → fall back to `setup_progress.status` (or `not_started`)
+- Result: a pre-registered user landing on `/register-entity` immediately sees a green tick on step 1 without clicking Continue. Same for departments / employees.
 
-### 3. New component: `UploadValidationModal` (inline in same file, or `src/components/employee-upload/UploadValidationModal.tsx`)
-- Built on shadcn `Dialog`.
-- Title: "Upload Validation Errors".
-- Description: count summary, e.g. "Found 7 errors across 4 rows. Please fix the file and try again."
-- Body: shadcn `Table` with columns **Row**, **Field**, **Error**, scrollable (`max-h-96 overflow-auto`).
-- Footer: single "Close" button. No "Continue / Insert" action — inserts are out of scope.
-- Errors sorted by row, then by the canonical field order from HEADERS.
+### 4. Move existing route files under the layout
+- `src/routes/_authenticated/register-entity.tsx` → `src/routes/_authenticated/_setup/register-entity.tsx`
+- `src/routes/_authenticated/org-departments.tsx` → `src/routes/_authenticated/_setup/org-departments.tsx`
+- `src/routes/_authenticated/employee-upload.tsx` → `src/routes/_authenticated/_setup/employee-upload.tsx`
 
-### 4. State in `EmployeeUploadPage`
-- `selectedFile: File | null`
-- `isValidating: boolean`
-- `errors: ValidationError[]`
-- `modalOpen: boolean`
-- `entity_id` from `useEntity()` — guard with "Loading entity…" if null/loading; Upload button disabled until ready.
+Update `createFileRoute` strings to `"/_authenticated/_setup/<x>"`. URL paths stay identical because `_setup` is pathless.
+
+### 5. Update `src/routes/_authenticated.tsx` guard
+- Delete the `onRegisterEntity` branch that returns `<Outlet />` bare (without AppShell).
+- Delete the `shouldHoldRegisterEntity` early return.
+- Keep the "hr_rep with no entity → /register-entity" redirect.
+- Always wrap `<Outlet />` in `<AppShell>`. ← **this is the core ask**.
+
+### 6. Update `register-entity.tsx`
+Strip the full-viewport centered hero treatment (`min-h-[calc(100vh-4rem)]`, gradient blobs, centered card, BonusBridge logo inside the card) since it now lives inside AppShell + setup checklist. Replace with a normal page layout consistent with `/org-departments` and `/employee-upload`:
+- `<div className="mx-auto max-w-2xl space-y-6">` wrapping the existing `<Card>` (form unchanged).
+
+### 7. Refactor `setup.tsx`
+- Import `STEPS` from `src/components/setup/steps.ts`.
+- "Go" button: if `step.route` exists → `navigate({ to: step.route })`; else → existing "Coming soon" toast (drops the `register_entity`-only special case).
+
+### 8. AppSidebar — no functional change
+The "Setup" entry still points to `/setup`. The new in-context checklist is *additive* — it shows on the LHS of setup screens; the global app sidebar stays where it is.
 
 ## What I am NOT doing
-- No inserts into `people`, `people_roles`, `people_org_departments`, `people_functional_departments`, or `excel_uploads`. That is the next step.
-- No new Supabase tables, columns, or RLS changes.
-- No template/format changes to Step 1.
-- No reassignment / fix-in-place flow inside the modal — close-only.
+- No Supabase schema changes (workspace rule).
+- No automatic writes to `setup_progress` from the layout — derivation is read-only.
+- No changes to Step 2 validation logic in `employee-upload.tsx` (only its route path moves).
+- No changes to Auth/Entity contexts.
+- No new routes for `assign_roles` etc. — they stay greyed in the checklist until built.
+- No mobile drawer for the checklist; on small viewports it stacks above content.
 
 ## Verification checklist
-- Pick a non-`.xlsx` file → file picker rejects it (accept attribute) and Upload stays disabled.
-- Upload the unmodified template (only example row) → example row is skipped, toast "All rows valid".
-- Upload a file with: blank `email`, a duplicate of an existing person's email, unknown org dept, unknown functional dept, salary `"abc"`, date `"15/01/2024"`, role `"admin"` → modal opens listing every offending row/field/error in the wording specified.
-- Multiple errors on the same row all appear as separate entries.
-- Same email appearing twice in the upload itself is flagged as Duplicate email on the second (and later) occurrences.
-- Closing the modal returns to the page with the file still selected so the user can retry after fixing.
+- `hr_rep` with no entity → routed to `/register-entity`. TopNav with logout visible. LHS checklist shows step 1 highlighted, no green ticks. Other steps disabled.
+- After registering → redirected to `/org-departments`. Step 1 shows a green tick. Steps 2+ now clickable.
+- Manually navigating back to `/register-entity` shows the prefilled "Continue" form AND step 1 has a green tick.
+- `hr_rep` pre-loaded with entity + ≥1 org dept + ≥1 employee → first three steps all green on landing.
+- Clicking `/employee-upload` in the LHS keeps the checklist visible; logout still works from TopNav.
+- Non-HR/non-CEO hitting `/register-entity` directly → "Access denied" card, no checklist shown.
+- Standalone `/setup` page still works; "Go" navigates to the relevant route.

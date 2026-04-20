@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedSetupLayoutRouteImport } from './routes/_authenticated/_setupLayout'
+import { Route as AuthenticatedSetupLayoutRoleAssignmentRouteImport } from './routes/_authenticated/_setupLayout/role-assignment'
 import { Route as AuthenticatedSetupLayoutRegisterEntityRouteImport } from './routes/_authenticated/_setupLayout/register-entity'
 import { Route as AuthenticatedSetupLayoutOrgDepartmentsRouteImport } from './routes/_authenticated/_setupLayout/org-departments'
 import { Route as AuthenticatedSetupLayoutEmployeeUploadRouteImport } from './routes/_authenticated/_setupLayout/employee-upload'
@@ -48,6 +49,12 @@ const AuthenticatedSetupLayoutRoute =
     id: '/_setupLayout',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSetupLayoutRoleAssignmentRoute =
+  AuthenticatedSetupLayoutRoleAssignmentRouteImport.update({
+    id: '/role-assignment',
+    path: '/role-assignment',
+    getParentRoute: () => AuthenticatedSetupLayoutRoute,
+  } as any)
 const AuthenticatedSetupLayoutRegisterEntityRoute =
   AuthenticatedSetupLayoutRegisterEntityRouteImport.update({
     id: '/register-entity',
@@ -75,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
+  '/role-assignment': typeof AuthenticatedSetupLayoutRoleAssignmentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -84,6 +92,7 @@ export interface FileRoutesByTo {
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
+  '/role-assignment': typeof AuthenticatedSetupLayoutRoleAssignmentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -96,6 +105,7 @@ export interface FileRoutesById {
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/_authenticated/_setupLayout/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/_authenticated/_setupLayout/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
+  '/_authenticated/_setupLayout/role-assignment': typeof AuthenticatedSetupLayoutRoleAssignmentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -107,6 +117,7 @@ export interface FileRouteTypes {
     | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
+    | '/role-assignment'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -116,6 +127,7 @@ export interface FileRouteTypes {
     | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
+    | '/role-assignment'
   id:
     | '__root__'
     | '/'
@@ -127,6 +139,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_setupLayout/employee-upload'
     | '/_authenticated/_setupLayout/org-departments'
     | '/_authenticated/_setupLayout/register-entity'
+    | '/_authenticated/_setupLayout/role-assignment'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -179,6 +192,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupLayoutRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/_setupLayout/role-assignment': {
+      id: '/_authenticated/_setupLayout/role-assignment'
+      path: '/role-assignment'
+      fullPath: '/role-assignment'
+      preLoaderRoute: typeof AuthenticatedSetupLayoutRoleAssignmentRouteImport
+      parentRoute: typeof AuthenticatedSetupLayoutRoute
+    }
     '/_authenticated/_setupLayout/register-entity': {
       id: '/_authenticated/_setupLayout/register-entity'
       path: '/register-entity'
@@ -207,6 +227,7 @@ interface AuthenticatedSetupLayoutRouteChildren {
   AuthenticatedSetupLayoutEmployeeUploadRoute: typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   AuthenticatedSetupLayoutOrgDepartmentsRoute: typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   AuthenticatedSetupLayoutRegisterEntityRoute: typeof AuthenticatedSetupLayoutRegisterEntityRoute
+  AuthenticatedSetupLayoutRoleAssignmentRoute: typeof AuthenticatedSetupLayoutRoleAssignmentRoute
 }
 
 const AuthenticatedSetupLayoutRouteChildren: AuthenticatedSetupLayoutRouteChildren =
@@ -217,6 +238,8 @@ const AuthenticatedSetupLayoutRouteChildren: AuthenticatedSetupLayoutRouteChildr
       AuthenticatedSetupLayoutOrgDepartmentsRoute,
     AuthenticatedSetupLayoutRegisterEntityRoute:
       AuthenticatedSetupLayoutRegisterEntityRoute,
+    AuthenticatedSetupLayoutRoleAssignmentRoute:
+      AuthenticatedSetupLayoutRoleAssignmentRoute,
   }
 
 const AuthenticatedSetupLayoutRouteWithChildren =

@@ -115,6 +115,7 @@ function EmployeeUploadPage() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   if (!allowed) {
     return (

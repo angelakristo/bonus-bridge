@@ -13,6 +13,13 @@ import {
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { updatePersonRoles } from "@/integrations/supabase/role-assignment.functions";
 import type { UserRole } from "@/components/role-assignment/RoleChip";
 
@@ -23,11 +30,17 @@ const ALL_ROLES: { role: UserRole; label: string }[] = [
   { role: "employee", label: "Employee" },
 ];
 
+const NONE_VALUE = "__none__";
+
+export type FunctionalDepartmentOption = { id: string; name: string };
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   person: { id: string; first_name: string; last_name: string } | null;
   currentRoles: UserRole[];
+  currentFunctionalDepartmentId: string | null;
+  functionalDepartments: FunctionalDepartmentOption[];
   entity_id: string;
   onSaved: () => void;
 };
@@ -37,20 +50,24 @@ export function EditRolesModal({
   onOpenChange,
   person,
   currentRoles,
+  currentFunctionalDepartmentId,
+  functionalDepartments,
   entity_id,
   onSaved,
 }: Props) {
   const updateFn = useServerFn(updatePersonRoles);
   const [selected, setSelected] = useState<Set<UserRole>>(new Set(currentRoles));
+  const [funcDeptId, setFuncDeptId] = useState<string | null>(currentFunctionalDepartmentId);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (open) {
       setSelected(new Set(currentRoles));
+      setFuncDeptId(currentFunctionalDepartmentId);
       setError(null);
     }
-  }, [open, currentRoles]);
+  }, [open, currentRoles, currentFunctionalDepartmentId]);
 
   if (!person) return null;
 
@@ -74,7 +91,12 @@ export function EditRolesModal({
     setSaving(true);
     try {
       const result = await updateFn({
-        data: { person_id: person.id, entity_id, roles: rolesArr },
+        data: {
+          person_id: person.id,
+          entity_id,
+          roles: rolesArr,
+          functional_department_id: funcDeptId,
+        },
       });
       if (!result.ok) {
         setError(result.error ?? "Failed to update roles");
@@ -99,20 +121,46 @@ export function EditRolesModal({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 py-2">
-          {ALL_ROLES.map(({ role, label }) => (
-            <div key={role} className="flex items-center gap-3">
-              <Checkbox
-                id={`role-${role}`}
-                checked={selected.has(role)}
-                onCheckedChange={(c) => toggle(role, c === true)}
-                disabled={saving}
-              />
-              <Label htmlFor={`role-${role}`} className="cursor-pointer">
-                {label}
-              </Label>
-            </div>
-          ))}
+        <div className="flex flex-col gap-4 py-2">
+          <div className="flex flex-col gap-3">
+            <Label className="text-sm font-medium">Roles</Label>
+            {ALL_ROLES.map(({ role, label }) => (
+              <div key={role} className="flex items-center gap-3">
+                <Checkbox
+                  id={`role-${role}`}
+                  checked={selected.has(role)}
+                  onCheckedChange={(c) => toggle(role, c === true)}
+                  disabled={saving}
+                />
+                <Label htmlFor={`role-${role}`} className="cursor-pointer">
+                  {label}
+                </Label>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="func-dept" className="text-sm font-medium">
+              Functional Department
+            </Label>
+            <Select
+              value={funcDeptId ?? NONE_VALUE}
+              onValueChange={(v) => setFuncDeptId(v === NONE_VALUE ? null : v)}
+              disabled={saving}
+            >
+              <SelectTrigger id="func-dept">
+                <SelectValue placeholder="Select a functional department" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NONE_VALUE}>— None —</SelectItem>
+                {functionalDepartments.map((d) => (
+                  <SelectItem key={d.id} value={d.id}>
+                    {d.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
           {error && <p className="text-destructive text-sm">{error}</p>}
         </div>

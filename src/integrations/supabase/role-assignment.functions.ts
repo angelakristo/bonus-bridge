@@ -10,6 +10,7 @@ const InputSchema = z.object({
   person_id: z.string().uuid(),
   entity_id: z.string().uuid(),
   roles: z.array(RoleEnum).min(1),
+  functional_department_id: z.string().uuid().nullable(),
 });
 
 export type UpdatePersonRolesResult = {
@@ -22,7 +23,7 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }): Promise<UpdatePersonRolesResult> => {
-    const { person_id, entity_id, roles } = data;
+    const { person_id, entity_id, roles, functional_department_id } = data;
 
     // 1. Verify person belongs to entity
     const personRes = await supabaseAdmin
@@ -52,7 +53,6 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
     const toAdd = roles.filter((r) => !existing.has(r));
     const toRemove = Array.from(existing).filter((r) => !next.has(r));
 
-    // 3a. Insert added
     if (toAdd.length > 0) {
       const insertRes = await supabaseAdmin
         .from("people_roles")
@@ -62,7 +62,6 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
       }
     }
 
-    // 3b. Delete removed
     if (toRemove.length > 0) {
       const deleteRes = await supabaseAdmin
         .from("people_roles")
@@ -71,6 +70,30 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
         .in("role", toRemove);
       if (deleteRes.error) {
         return { ok: false, error: `Failed to remove roles: ${deleteRes.error.message}` };
+      }
+    }
+
+    // 3. Sync functional department (single assignment per person)
+    const delFuncRes = await supabaseAdmin
+      .from("people_functional_departments")
+      .delete()
+      .eq("person_id", person_id);
+    if (delFuncRes.error) {
+      return {
+        ok: false,
+        error: `Failed to clear functional department: ${delFuncRes.error.message}`,
+      };
+    }
+
+    if (functional_department_id) {
+      const insFuncRes = await supabaseAdmin
+        .from("people_functional_departments")
+        .insert({ person_id, functional_department_id });
+      if (insFuncRes.error) {
+        return {
+          ok: false,
+          error: `Failed to set functional department: ${insFuncRes.error.message}`,
+        };
       }
     }
 

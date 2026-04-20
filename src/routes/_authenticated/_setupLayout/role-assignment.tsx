@@ -22,7 +22,10 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { RoleChip, type UserRole } from "@/components/role-assignment/RoleChip";
-import { EditRolesModal } from "@/components/role-assignment/EditRolesModal";
+import {
+  EditRolesModal,
+  type FunctionalDepartmentOption,
+} from "@/components/role-assignment/EditRolesModal";
 
 export const Route = createFileRoute("/_authenticated/_setupLayout/role-assignment")({
   component: RoleAssignmentPage,
@@ -34,6 +37,7 @@ type PersonRow = {
   last_name: string;
   email: string;
   roles: UserRole[];
+  functional_department_id: string | null;
 };
 
 function RoleAssignmentPage() {
@@ -42,33 +46,49 @@ function RoleAssignmentPage() {
   const allowed = roles.includes("hr_rep") || roles.includes("ceo");
 
   const [people, setPeople] = useState<PersonRow[]>([]);
+  const [funcDepts, setFuncDepts] = useState<FunctionalDepartmentOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!entity_id) return;
     setLoading(true);
-    const { data, error } = await supabase
-      .from("people")
-      .select("id, first_name, last_name, email, people_roles(role)")
-      .eq("entity_id", entity_id)
-      .eq("is_active", true)
-      .order("last_name", { ascending: true });
+    const [peopleRes, funcRes] = await Promise.all([
+      supabase
+        .from("people")
+        .select(
+          "id, first_name, last_name, email, people_roles(role), people_functional_departments(functional_department_id)",
+        )
+        .eq("entity_id", entity_id)
+        .eq("is_active", true)
+        .order("last_name", { ascending: true }),
+      supabase.from("functional_departments").select("id, name").order("name"),
+    ]);
 
-    if (error) {
-      console.error("[role-assignment] load failed", error);
+    if (peopleRes.error) {
+      console.error("[role-assignment] load people failed", peopleRes.error);
       setPeople([]);
     } else {
       setPeople(
-        (data ?? []).map((p) => ({
+        (peopleRes.data ?? []).map((p) => ({
           id: p.id,
           first_name: p.first_name,
           last_name: p.last_name,
           email: p.email,
           roles: (p.people_roles ?? []).map((r) => r.role) as UserRole[],
+          functional_department_id:
+            (p.people_functional_departments ?? [])[0]?.functional_department_id ?? null,
         })),
       );
     }
+
+    if (funcRes.error) {
+      console.error("[role-assignment] load functional depts failed", funcRes.error);
+      setFuncDepts([]);
+    } else {
+      setFuncDepts(funcRes.data ?? []);
+    }
+
     setLoading(false);
   }, [entity_id]);
 
@@ -80,6 +100,12 @@ function RoleAssignmentPage() {
     () => people.find((p) => p.id === editingId) ?? null,
     [people, editingId],
   );
+
+  const funcDeptNameById = useMemo(() => {
+    const m = new Map<string, string>();
+    funcDepts.forEach((d) => m.set(d.id, d.name));
+    return m;
+  }, [funcDepts]);
 
   if (!allowed) {
     return (
@@ -99,7 +125,8 @@ function RoleAssignmentPage() {
       <div>
         <h1 className="text-2xl font-semibold">Assign Roles</h1>
         <p className="text-muted-foreground text-sm">
-          Manage which roles each person holds. A person must always have at least one role.
+          Manage which roles each person holds and assign them to a functional department. A
+          person must always have at least one role.
         </p>
       </div>
 
@@ -124,6 +151,7 @@ function RoleAssignmentPage() {
                   <TableHead>Full Name</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Current Roles</TableHead>
+                  <TableHead>Functional Department</TableHead>
                   <TableHead className="w-24 text-right">Edit</TableHead>
                 </TableRow>
               </TableHeader>
@@ -143,6 +171,13 @@ function RoleAssignmentPage() {
                             <RoleChip key={r} role={r} />
                           ))}
                         </div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {p.functional_department_id ? (
+                        funcDeptNameById.get(p.functional_department_id) ?? "—"
+                      ) : (
+                        <span className="text-muted-foreground text-sm">Not assigned</span>
                       )}
                     </TableCell>
                     <TableCell className="text-right">
@@ -170,6 +205,8 @@ function RoleAssignmentPage() {
           }}
           person={editingPerson}
           currentRoles={editingPerson?.roles ?? []}
+          currentFunctionalDepartmentId={editingPerson?.functional_department_id ?? null}
+          functionalDepartments={funcDepts}
           entity_id={entity_id}
           onSaved={load}
         />

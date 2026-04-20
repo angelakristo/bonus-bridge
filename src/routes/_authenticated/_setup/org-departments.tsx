@@ -37,7 +37,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-export const Route = createFileRoute("/_authenticated/org-departments")({
+export const Route = createFileRoute("/_authenticated/_setup/org-departments")({
   component: OrgDepartmentBuilderPage,
 });
 

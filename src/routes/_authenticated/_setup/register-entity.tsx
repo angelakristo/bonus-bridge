@@ -10,9 +10,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import bonusbridgeLogo from "@/assets/bonusbridge-login-logo.png";
 
-export const Route = createFileRoute("/_authenticated/register-entity")({
+export const Route = createFileRoute("/_authenticated/_setup/register-entity")({
   component: RegisterEntityPage,
 });
 
@@ -81,7 +80,7 @@ function RegisterEntityPage() {
 
   if (authReady && !authLoading && !isHrRep) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
+      <div className="p-6">
         <p className="text-sm text-muted-foreground">Access denied. Redirecting...</p>
       </div>
     );
@@ -99,7 +98,6 @@ function RegisterEntityPage() {
     setSubmitting(true);
 
     if (isExisting && entity_id) {
-      // UPDATE existing entity
       const { data, error } = await supabase
         .from("entities")
         .update({
@@ -125,7 +123,6 @@ function RegisterEntityPage() {
       return;
     }
 
-    // INSERT new entity
     const { data, error } = await supabase
       .from("entities")
       .insert({
@@ -155,23 +152,24 @@ function RegisterEntityPage() {
     : isExisting ? "Continue" : "Register Company";
 
   return (
-    <div className="relative flex min-h-[calc(100vh-4rem)] items-center justify-center overflow-hidden bg-background p-6">
-      <div className="pointer-events-none absolute -top-32 -left-32 h-96 w-96 rounded-full bg-primary/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-32 -right-32 h-96 w-96 rounded-full bg-accent/20 blur-3xl" />
+    <div className="mx-auto w-full max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          {isExisting ? "Confirm your company details" : "Register your company"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {isExisting
+            ? "Review and update your organisation details, then continue."
+            : "Create your organisation to begin setting up BonusBridge."}
+        </p>
+      </div>
 
-      <Card className="relative w-full max-w-md border-border/60 shadow-xl backdrop-blur">
-        <CardHeader className="items-center space-y-4 text-center">
-          <img src={bonusbridgeLogo} alt="BonusBridge" className="h-16 w-auto" />
-          <div className="space-y-1">
-            <CardTitle className="text-2xl">
-              {isExisting ? "Confirm your company details" : "Register your company"}
-            </CardTitle>
-            <CardDescription>
-              {isExisting
-                ? "Review and update your organisation details, then continue."
-                : "Create your organisation to begin setting up BonusBridge."}
-            </CardDescription>
-          </div>
+      <Card>
+        <CardHeader>
+          <CardTitle>Company details</CardTitle>
+          <CardDescription>
+            These details identify your organisation across BonusBridge.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -198,7 +196,7 @@ function RegisterEntityPage() {
                 disabled={prefilling}
               />
             </div>
-            <Button type="submit" className="w-full" disabled={submitting || prefilling}>
+            <Button type="submit" disabled={submitting || prefilling}>
               {submitLabel}
             </Button>
           </form>

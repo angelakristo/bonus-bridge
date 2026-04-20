@@ -608,10 +608,28 @@ function KpiBoardPage() {
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     Corporate KPIs ({corpKpis.length}/10)
                   </CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => openModal("corporate")}>
-                    <Plus className="h-4 w-4" />
-                    Add KPI
-                  </Button>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={corpAtLimit ? 0 : -1}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={corpAtLimit}
+                            onClick={() => openModal("corporate")}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add KPI
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {corpAtLimit && (
+                        <TooltipContent>
+                          Corporate KPI limit reached. Maximum 10 KPIs per board.
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </CardHeader>
               <CardContent className="flex-1 p-0">

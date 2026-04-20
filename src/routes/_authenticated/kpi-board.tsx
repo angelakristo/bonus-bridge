@@ -190,12 +190,22 @@ async function fetchOrgDepts(entityId: string): Promise<OrgDept[]> {
 /*  DB mutation helpers                                                */
 /* ------------------------------------------------------------------ */
 
+const MAX_KPIS_PER_BOARD = 10;
+
 async function insertCorporateKpi(
   entityId: string,
   kpiDefId: string,
   year: number,
   displayOrder: number,
 ) {
+  // Check board limit
+  const { count: totalCount } = await supabase
+    .from("corporate_kpis")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_id", entityId)
+    .eq("year", year);
+  if ((totalCount ?? 0) >= MAX_KPIS_PER_BOARD) throw new Error("LIMIT");
+
   // Check duplicate
   const { count } = await supabase
     .from("corporate_kpis")

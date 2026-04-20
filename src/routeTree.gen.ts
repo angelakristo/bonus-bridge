@@ -19,6 +19,7 @@ import { Route as AuthenticatedSetupLayoutRoleAssignmentRouteImport } from './ro
 import { Route as AuthenticatedSetupLayoutRegisterEntityRouteImport } from './routes/_authenticated/_setupLayout/register-entity'
 import { Route as AuthenticatedSetupLayoutOrgDepartmentsRouteImport } from './routes/_authenticated/_setupLayout/org-departments'
 import { Route as AuthenticatedSetupLayoutEmployeeUploadRouteImport } from './routes/_authenticated/_setupLayout/employee-upload'
+import { Route as AuthenticatedSetupLayoutDriverWeightingsRouteImport } from './routes/_authenticated/_setupLayout/driver-weightings'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -73,12 +74,19 @@ const AuthenticatedSetupLayoutEmployeeUploadRoute =
     path: '/employee-upload',
     getParentRoute: () => AuthenticatedSetupLayoutRoute,
   } as any)
+const AuthenticatedSetupLayoutDriverWeightingsRoute =
+  AuthenticatedSetupLayoutDriverWeightingsRouteImport.update({
+    id: '/driver-weightings',
+    path: '/driver-weightings',
+    getParentRoute: () => AuthenticatedSetupLayoutRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
@@ -89,6 +97,7 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
@@ -102,6 +111,7 @@ export interface FileRoutesById {
   '/_authenticated/_setupLayout': typeof AuthenticatedSetupLayoutRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
+  '/_authenticated/_setupLayout/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/_authenticated/_setupLayout/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/_authenticated/_setupLayout/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
@@ -114,6 +124,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/setup'
+    | '/driver-weightings'
     | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
@@ -124,6 +135,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/dashboard'
     | '/setup'
+    | '/driver-weightings'
     | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
@@ -136,6 +148,7 @@ export interface FileRouteTypes {
     | '/_authenticated/_setupLayout'
     | '/_authenticated/dashboard'
     | '/_authenticated/setup'
+    | '/_authenticated/_setupLayout/driver-weightings'
     | '/_authenticated/_setupLayout/employee-upload'
     | '/_authenticated/_setupLayout/org-departments'
     | '/_authenticated/_setupLayout/register-entity'
@@ -220,10 +233,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupLayoutEmployeeUploadRouteImport
       parentRoute: typeof AuthenticatedSetupLayoutRoute
     }
+    '/_authenticated/_setupLayout/driver-weightings': {
+      id: '/_authenticated/_setupLayout/driver-weightings'
+      path: '/driver-weightings'
+      fullPath: '/driver-weightings'
+      preLoaderRoute: typeof AuthenticatedSetupLayoutDriverWeightingsRouteImport
+      parentRoute: typeof AuthenticatedSetupLayoutRoute
+    }
   }
 }
 
 interface AuthenticatedSetupLayoutRouteChildren {
+  AuthenticatedSetupLayoutDriverWeightingsRoute: typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   AuthenticatedSetupLayoutEmployeeUploadRoute: typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   AuthenticatedSetupLayoutOrgDepartmentsRoute: typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   AuthenticatedSetupLayoutRegisterEntityRoute: typeof AuthenticatedSetupLayoutRegisterEntityRoute
@@ -232,6 +253,8 @@ interface AuthenticatedSetupLayoutRouteChildren {
 
 const AuthenticatedSetupLayoutRouteChildren: AuthenticatedSetupLayoutRouteChildren =
   {
+    AuthenticatedSetupLayoutDriverWeightingsRoute:
+      AuthenticatedSetupLayoutDriverWeightingsRoute,
     AuthenticatedSetupLayoutEmployeeUploadRoute:
       AuthenticatedSetupLayoutEmployeeUploadRoute,
     AuthenticatedSetupLayoutOrgDepartmentsRoute:

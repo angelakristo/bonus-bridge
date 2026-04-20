@@ -13,10 +13,11 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
-import { Route as AuthenticatedRegisterEntityRouteImport } from './routes/_authenticated/register-entity'
-import { Route as AuthenticatedOrgDepartmentsRouteImport } from './routes/_authenticated/org-departments'
-import { Route as AuthenticatedEmployeeUploadRouteImport } from './routes/_authenticated/employee-upload'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/_setup'
+import { Route as AuthenticatedSetupRegisterEntityRouteImport } from './routes/_authenticated/_setup/register-entity'
+import { Route as AuthenticatedSetupOrgDepartmentsRouteImport } from './routes/_authenticated/_setup/org-departments'
+import { Route as AuthenticatedSetupEmployeeUploadRouteImport } from './routes/_authenticated/_setup/employee-upload'
 
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
@@ -37,58 +38,63 @@ const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
-const AuthenticatedRegisterEntityRoute =
-  AuthenticatedRegisterEntityRouteImport.update({
-    id: '/register-entity',
-    path: '/register-entity',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedOrgDepartmentsRoute =
-  AuthenticatedOrgDepartmentsRouteImport.update({
-    id: '/org-departments',
-    path: '/org-departments',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedEmployeeUploadRoute =
-  AuthenticatedEmployeeUploadRouteImport.update({
-    id: '/employee-upload',
-    path: '/employee-upload',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
+  id: '/_setup',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSetupRegisterEntityRoute =
+  AuthenticatedSetupRegisterEntityRouteImport.update({
+    id: '/register-entity',
+    path: '/register-entity',
+    getParentRoute: () => AuthenticatedSetupRoute,
+  } as any)
+const AuthenticatedSetupOrgDepartmentsRoute =
+  AuthenticatedSetupOrgDepartmentsRouteImport.update({
+    id: '/org-departments',
+    path: '/org-departments',
+    getParentRoute: () => AuthenticatedSetupRoute,
+  } as any)
+const AuthenticatedSetupEmployeeUploadRoute =
+  AuthenticatedSetupEmployeeUploadRouteImport.update({
+    id: '/employee-upload',
+    path: '/employee-upload',
+    getParentRoute: () => AuthenticatedSetupRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/employee-upload': typeof AuthenticatedEmployeeUploadRoute
-  '/org-departments': typeof AuthenticatedOrgDepartmentsRoute
-  '/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/employee-upload': typeof AuthenticatedSetupEmployeeUploadRoute
+  '/org-departments': typeof AuthenticatedSetupOrgDepartmentsRoute
+  '/register-entity': typeof AuthenticatedSetupRegisterEntityRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
-  '/employee-upload': typeof AuthenticatedEmployeeUploadRoute
-  '/org-departments': typeof AuthenticatedOrgDepartmentsRoute
-  '/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/employee-upload': typeof AuthenticatedSetupEmployeeUploadRoute
+  '/org-departments': typeof AuthenticatedSetupOrgDepartmentsRoute
+  '/register-entity': typeof AuthenticatedSetupRegisterEntityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
+  '/_authenticated/_setup': typeof AuthenticatedSetupRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
-  '/_authenticated/employee-upload': typeof AuthenticatedEmployeeUploadRoute
-  '/_authenticated/org-departments': typeof AuthenticatedOrgDepartmentsRoute
-  '/_authenticated/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
+  '/_authenticated/_setup/employee-upload': typeof AuthenticatedSetupEmployeeUploadRoute
+  '/_authenticated/_setup/org-departments': typeof AuthenticatedSetupOrgDepartmentsRoute
+  '/_authenticated/_setup/register-entity': typeof AuthenticatedSetupRegisterEntityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -96,29 +102,30 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/setup'
     | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
-    | '/setup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/login'
     | '/dashboard'
+    | '/setup'
     | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
-    | '/setup'
   id:
     | '__root__'
     | '/'
     | '/_authenticated'
     | '/login'
+    | '/_authenticated/_setup'
     | '/_authenticated/dashboard'
-    | '/_authenticated/employee-upload'
-    | '/_authenticated/org-departments'
-    | '/_authenticated/register-entity'
     | '/_authenticated/setup'
+    | '/_authenticated/_setup/employee-upload'
+    | '/_authenticated/_setup/org-departments'
+    | '/_authenticated/_setup/register-entity'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -157,27 +164,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/register-entity': {
-      id: '/_authenticated/register-entity'
-      path: '/register-entity'
-      fullPath: '/register-entity'
-      preLoaderRoute: typeof AuthenticatedRegisterEntityRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/org-departments': {
-      id: '/_authenticated/org-departments'
-      path: '/org-departments'
-      fullPath: '/org-departments'
-      preLoaderRoute: typeof AuthenticatedOrgDepartmentsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/employee-upload': {
-      id: '/_authenticated/employee-upload'
-      path: '/employee-upload'
-      fullPath: '/employee-upload'
-      preLoaderRoute: typeof AuthenticatedEmployeeUploadRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -185,22 +171,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/_setup': {
+      id: '/_authenticated/_setup'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/_setup/register-entity': {
+      id: '/_authenticated/_setup/register-entity'
+      path: '/register-entity'
+      fullPath: '/register-entity'
+      preLoaderRoute: typeof AuthenticatedSetupRegisterEntityRouteImport
+      parentRoute: typeof AuthenticatedSetupRoute
+    }
+    '/_authenticated/_setup/org-departments': {
+      id: '/_authenticated/_setup/org-departments'
+      path: '/org-departments'
+      fullPath: '/org-departments'
+      preLoaderRoute: typeof AuthenticatedSetupOrgDepartmentsRouteImport
+      parentRoute: typeof AuthenticatedSetupRoute
+    }
+    '/_authenticated/_setup/employee-upload': {
+      id: '/_authenticated/_setup/employee-upload'
+      path: '/employee-upload'
+      fullPath: '/employee-upload'
+      preLoaderRoute: typeof AuthenticatedSetupEmployeeUploadRouteImport
+      parentRoute: typeof AuthenticatedSetupRoute
+    }
   }
 }
 
+interface AuthenticatedSetupRouteChildren {
+  AuthenticatedSetupEmployeeUploadRoute: typeof AuthenticatedSetupEmployeeUploadRoute
+  AuthenticatedSetupOrgDepartmentsRoute: typeof AuthenticatedSetupOrgDepartmentsRoute
+  AuthenticatedSetupRegisterEntityRoute: typeof AuthenticatedSetupRegisterEntityRoute
+}
+
+const AuthenticatedSetupRouteChildren: AuthenticatedSetupRouteChildren = {
+  AuthenticatedSetupEmployeeUploadRoute: AuthenticatedSetupEmployeeUploadRoute,
+  AuthenticatedSetupOrgDepartmentsRoute: AuthenticatedSetupOrgDepartmentsRoute,
+  AuthenticatedSetupRegisterEntityRoute: AuthenticatedSetupRegisterEntityRoute,
+}
+
+const AuthenticatedSetupRouteWithChildren =
+  AuthenticatedSetupRoute._addFileChildren(AuthenticatedSetupRouteChildren)
+
 interface AuthenticatedRouteChildren {
+  AuthenticatedSetupRoute: typeof AuthenticatedSetupRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
-  AuthenticatedEmployeeUploadRoute: typeof AuthenticatedEmployeeUploadRoute
-  AuthenticatedOrgDepartmentsRoute: typeof AuthenticatedOrgDepartmentsRoute
-  AuthenticatedRegisterEntityRoute: typeof AuthenticatedRegisterEntityRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedSetupRoute: AuthenticatedSetupRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
-  AuthenticatedEmployeeUploadRoute: AuthenticatedEmployeeUploadRoute,
-  AuthenticatedOrgDepartmentsRoute: AuthenticatedOrgDepartmentsRoute,
-  AuthenticatedRegisterEntityRoute: AuthenticatedRegisterEntityRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
 }
 

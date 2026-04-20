@@ -18,7 +18,6 @@ function AuthenticatedLayout() {
   const onRegisterEntity = location.pathname === "/register-entity";
   const isHrRep = roles.includes("hr_rep");
   const needsEntityRegistration = isHrRep && !entity_id;
-  const shouldHoldRegisterEntity = onRegisterEntity && !!session && (!authReady || authLoading || entityLoading);
 
   const logGuard = (redirectTarget: string | null, reason: string) => {
     console.log("[Guard]", {
@@ -73,22 +72,12 @@ function AuthenticatedLayout() {
     person,
   ]);
 
-  if (shouldHoldRegisterEntity) {
-    logGuard(null, "rendering /register-entity while auth or entity state finishes resolving");
-    return <Outlet />;
-  }
-
   if (!authReady || authLoading || entityLoading || !session) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">Loading...</p>
       </div>
     );
-  }
-
-  // Render the registration screen WITHOUT the app shell so it owns the viewport.
-  if (onRegisterEntity) {
-    return <Outlet />;
   }
 
   return (

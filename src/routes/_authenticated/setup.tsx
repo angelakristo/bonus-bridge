@@ -10,31 +10,13 @@ import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { STEPS } from "@/components/setup/steps";
 
 type SetupStepStatus = Database["public"]["Enums"]["setup_step_status"];
 
 export const Route = createFileRoute("/_authenticated/setup")({
   component: SetupPage,
 });
-
-type StepDef = {
-  key: string;
-  title: string;
-  description: string;
-};
-
-const STEPS: StepDef[] = [
-  { key: "register_entity", title: "Register Entity", description: "Set your organisation name and basic details." },
-  { key: "build_org_departments", title: "Build Org Departments", description: "Create your organisational department hierarchy." },
-  { key: "upload_employees", title: "Upload Employees", description: "Import your employee list from a spreadsheet." },
-  { key: "assign_roles", title: "Assign Roles", description: "Give each person their CEO, manager, HR or employee role." },
-  { key: "set_driver_weightings", title: "Set Driver Weightings", description: "Allocate % weight to Growth, Efficiency and Culture." },
-  { key: "configure_corporate_kpis", title: "Configure Corporate KPIs", description: "Define the KPIs that apply company-wide." },
-  { key: "configure_department_kpis", title: "Configure Department KPIs", description: "Define KPIs for each department." },
-  { key: "employee_kpi_proposals", title: "Employee KPI Proposals", description: "Review and approve individual KPI proposals." },
-  { key: "assign_weightings", title: "Assign Weightings", description: "Set how corporate / department / individual KPIs weigh per employee." },
-  { key: "assign_bonus_schemes", title: "Assign Bonus Schemes", description: "Link each employee to a bonus scheme and tier." },
-];
 
 const STATUS_META: Record<SetupStepStatus, { label: string; variant: "secondary" | "default" | "outline"; className: string }> = {
   not_started: { label: "Not Started", variant: "outline", className: "" },
@@ -54,27 +36,62 @@ function SetupPage() {
   const allowed = roles.some((r) => (ALLOWED_ROLES as readonly string[]).includes(r));
 
   useEffect(() => {
-    if (!entity_id || !allowed) {
+    if (!allowed) {
       setLoading(false);
       return;
     }
-    supabase
-      .from("setup_progress")
-      .select("step_key, status")
-      .eq("entity_id", entity_id)
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("Failed to load setup progress:", error);
-          toast.error("Failed to load setup progress");
-        } else {
-          const map: Record<string, SetupStepStatus> = {};
-          data?.forEach((row) => {
-            map[row.step_key] = row.status;
-          });
-          setProgress(map);
+
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      const derived: Record<string, SetupStepStatus> = {};
+      derived.register_entity = entity_id ? "complete" : "not_started";
+
+      if (!entity_id) {
+        if (!cancelled) {
+          setProgress(derived);
+          setLoading(false);
         }
-        setLoading(false);
+        return;
+      }
+
+      const [progressRes, orgDeptRes, peopleRes] = await Promise.all([
+        supabase.from("setup_progress").select("step_key, status").eq("entity_id", entity_id),
+        supabase
+          .from("organisational_departments")
+          .select("id", { head: true, count: "exact" })
+          .eq("entity_id", entity_id),
+        supabase
+          .from("people")
+          .select("id", { head: true, count: "exact" })
+          .eq("entity_id", entity_id),
+      ]);
+
+      if (cancelled) return;
+
+      if (progressRes.error) {
+        console.error("Failed to load setup progress:", progressRes.error);
+        toast.error("Failed to load setup progress");
+      }
+
+      (progressRes.data ?? []).forEach((row) => {
+        derived[row.step_key] = row.status;
       });
+
+      derived.register_entity = "complete";
+      derived.build_org_departments =
+        (orgDeptRes.count ?? 0) > 0 ? "complete" : derived.build_org_departments ?? "not_started";
+      derived.upload_employees =
+        (peopleRes.count ?? 0) > 0 ? "complete" : derived.upload_employees ?? "not_started";
+
+      setProgress(derived);
+      setLoading(false);
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [entity_id, allowed]);
 
   const completedCount = useMemo(
@@ -146,8 +163,8 @@ function SetupPage() {
                       variant={isComplete ? "outline" : "default"}
                       size="sm"
                       onClick={() => {
-                        if (step.key === "register_entity") {
-                          navigate({ to: "/register-entity" });
+                        if (step.route) {
+                          navigate({ to: step.route });
                         } else {
                           toast("Coming soon", { description: `${step.title} screen is not built yet.` });
                         }

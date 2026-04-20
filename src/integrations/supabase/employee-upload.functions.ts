@@ -29,8 +29,22 @@ export type CommitEmployeeUploadResult = {
 
 export const commitEmployeeUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => InputSchema.parse(input))
+  .inputValidator((input: unknown) => {
+    const parsed = InputSchema.safeParse(input);
+    if (!parsed.success) {
+      // Pass through as a validated payload that the handler can detect.
+      return { __invalid: true, message: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") } as never;
+    }
+    return parsed.data;
+  })
   .handler(async ({ data }): Promise<CommitEmployeeUploadResult> => {
+    if ((data as unknown as { __invalid?: boolean }).__invalid) {
+      return {
+        inserted: 0,
+        inviteFailures: [],
+        partialError: `Invalid request: ${(data as unknown as { message: string }).message}`,
+      };
+    }
     const { entity_id, uploaded_by_person_id, file_name, rows } = data;
 
     // Pre-flight: resolve org department names → ids

@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
+import { Route as AuthenticatedKpiBoardRouteImport } from './routes/_authenticated/kpi-board'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedSetupLayoutRouteImport } from './routes/_authenticated/_setupLayout'
 import { Route as AuthenticatedSetupLayoutRoleAssignmentRouteImport } from './routes/_authenticated/_setupLayout/role-assignment'
@@ -38,6 +39,11 @@ const IndexRoute = IndexRouteImport.update({
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedKpiBoardRoute = AuthenticatedKpiBoardRouteImport.update({
+  id: '/kpi-board',
+  path: '/kpi-board',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
@@ -85,6 +91,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
@@ -96,6 +103,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
@@ -110,6 +118,7 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/_authenticated/_setupLayout': typeof AuthenticatedSetupLayoutRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/_setupLayout/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
@@ -123,6 +132,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/kpi-board'
     | '/setup'
     | '/driver-weightings'
     | '/employee-upload'
@@ -134,6 +144,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/kpi-board'
     | '/setup'
     | '/driver-weightings'
     | '/employee-upload'
@@ -147,6 +158,7 @@ export interface FileRouteTypes {
     | '/login'
     | '/_authenticated/_setupLayout'
     | '/_authenticated/dashboard'
+    | '/_authenticated/kpi-board'
     | '/_authenticated/setup'
     | '/_authenticated/_setupLayout/driver-weightings'
     | '/_authenticated/_setupLayout/employee-upload'
@@ -189,6 +201,13 @@ declare module '@tanstack/react-router' {
       path: '/setup'
       fullPath: '/setup'
       preLoaderRoute: typeof AuthenticatedSetupRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/kpi-board': {
+      id: '/_authenticated/kpi-board'
+      path: '/kpi-board'
+      fullPath: '/kpi-board'
+      preLoaderRoute: typeof AuthenticatedKpiBoardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/dashboard': {
@@ -273,12 +292,14 @@ const AuthenticatedSetupLayoutRouteWithChildren =
 interface AuthenticatedRouteChildren {
   AuthenticatedSetupLayoutRoute: typeof AuthenticatedSetupLayoutRouteWithChildren
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedKpiBoardRoute: typeof AuthenticatedKpiBoardRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSetupLayoutRoute: AuthenticatedSetupLayoutRouteWithChildren,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedKpiBoardRoute: AuthenticatedKpiBoardRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
 }
 

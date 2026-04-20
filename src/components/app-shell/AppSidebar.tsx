@@ -36,7 +36,7 @@ const NAV_ITEMS: NavItem[] = [
   { title: "My Dashboard", url: "/dashboard", icon: Home, roles: ["ceo", "manager", "hr_rep", "employee"] },
   { title: "Department View", url: "/departments", icon: Users, roles: ["ceo", "manager"] },
   { title: "Employee View", url: "/employees", icon: UserCircle, roles: ["ceo", "manager"] },
-  { title: "Corporate KPIs", url: "/corporate-kpis", icon: Target, roles: ["ceo"] },
+  { title: "KPI Board", url: "/kpi-board", icon: Target, roles: ["ceo", "manager"] },
   { title: "Bonus Schemes", url: "/bonus-schemes", icon: Wallet, roles: ["ceo"] },
   { title: "Setup", url: "/setup", icon: Settings, roles: ["ceo", "hr_rep"] },
   { title: "Upload Data", url: "/employee-upload", icon: Upload, roles: ["ceo", "hr_rep"] },

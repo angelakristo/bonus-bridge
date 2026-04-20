@@ -23,7 +23,6 @@ const HEADERS = [
   "last_name",
   "email",
   "org_department",
-  "functional_department",
   "annual_salary",
   "employment_start_date",
   "role",
@@ -36,7 +35,6 @@ const REQUIRED_FIELDS: FieldName[] = [
   "last_name",
   "email",
   "org_department",
-  "functional_department",
   "role",
 ];
 
@@ -48,7 +46,6 @@ const EXAMPLE_ROW: (string | number)[] = [
   "Smith",
   "jane.smith@company.com",
   "HQ — Commercial",
-  "Sales / Marketing",
   75000,
   "2024-01-15",
   "employee",
@@ -78,7 +75,6 @@ function downloadEmployeeTemplate() {
     { wch: 14 },
     { wch: 14 },
     { wch: 28 },
-    { wch: 22 },
     { wch: 22 },
     { wch: 14 },
     { wch: 20 },
@@ -197,28 +193,25 @@ function EmployeeUploadPage() {
         .map((r) => r.values.email.toLowerCase())
         .filter((e) => e.length > 0);
 
-      const [existingEmailsRes, orgDeptRes, funcDeptRes] = await Promise.all([
+      const [existingEmailsRes, orgDeptRes] = await Promise.all([
         emails.length > 0
           ? supabase.from("people").select("email").eq("entity_id", entity_id).in("email", emails)
           : Promise.resolve({ data: [] as { email: string }[], error: null }),
         supabase.from("organisational_departments").select("name").eq("entity_id", entity_id),
-        supabase.from("functional_departments").select("name"),
       ]);
 
       if (existingEmailsRes.error) throw existingEmailsRes.error;
       if (orgDeptRes.error) throw orgDeptRes.error;
-      if (funcDeptRes.error) throw funcDeptRes.error;
 
       const existingEmails = new Set(
         (existingEmailsRes.data ?? []).map((r) => (r.email ?? "").toLowerCase().trim()),
       );
       const orgDeptNames = new Set((orgDeptRes.data ?? []).map((r) => r.name));
-      const funcDeptNames = new Set((funcDeptRes.data ?? []).map((r) => r.name));
 
       const seenEmails = new Set<string>();
 
       for (const { row, values } of dataRows) {
-        // 1. Required fields (in spec order)
+        // 1. Required fields
         for (const f of REQUIRED_FIELDS) {
           if (values[f].trim() === "") {
             collected.push({ row, field: f, error: `Required field missing: ${f}` });
@@ -243,16 +236,7 @@ function EmployeeUploadPage() {
           });
         }
 
-        // 4. Functional department
-        if (values.functional_department && !funcDeptNames.has(values.functional_department)) {
-          collected.push({
-            row,
-            field: "functional_department",
-            error: `Functional department not found: ${values.functional_department}`,
-          });
-        }
-
-        // 5. Salary numeric
+        // 4. Salary numeric
         if (values.annual_salary !== "") {
           if (!Number.isFinite(Number(values.annual_salary))) {
             collected.push({
@@ -263,7 +247,7 @@ function EmployeeUploadPage() {
           }
         }
 
-        // 6. Date valid
+        // 5. Date valid
         if (values.employment_start_date !== "") {
           const v = values.employment_start_date;
           const matches = /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -278,7 +262,7 @@ function EmployeeUploadPage() {
           }
         }
 
-        // 7. Role enum
+        // 6. Role enum
         if (values.role && !VALID_ROLES.has(values.role.toLowerCase())) {
           collected.push({ row, field: "role", error: "Invalid role value" });
         }
@@ -312,7 +296,6 @@ function EmployeeUploadPage() {
           | "hr_rep"
           | "employee",
         org_department: values.org_department.trim(),
-        functional_department: values.functional_department.trim(),
       }));
 
       setIsCommitting(true);

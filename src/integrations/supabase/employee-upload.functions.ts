@@ -12,7 +12,6 @@ const RowSchema = z.object({
   employment_start_date: z.string(),
   role: z.enum(["ceo", "manager", "hr_rep", "employee"]),
   org_department: z.string().min(1),
-  functional_department: z.string().min(1),
 });
 
 const InputSchema = z.object({
@@ -34,14 +33,11 @@ export const commitEmployeeUpload = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<CommitEmployeeUploadResult> => {
     const { entity_id, uploaded_by_person_id, file_name, rows } = data;
 
-    // Pre-flight: resolve department names → ids
-    const [orgRes, funcRes] = await Promise.all([
-      supabaseAdmin
-        .from("organisational_departments")
-        .select("id, name")
-        .eq("entity_id", entity_id),
-      supabaseAdmin.from("functional_departments").select("id, name"),
-    ]);
+    // Pre-flight: resolve org department names → ids
+    const orgRes = await supabaseAdmin
+      .from("organisational_departments")
+      .select("id, name")
+      .eq("entity_id", entity_id);
 
     if (orgRes.error) {
       return {
@@ -50,16 +46,8 @@ export const commitEmployeeUpload = createServerFn({ method: "POST" })
         partialError: `Failed to load org departments: ${orgRes.error.message}`,
       };
     }
-    if (funcRes.error) {
-      return {
-        inserted: 0,
-        inviteFailures: [],
-        partialError: `Failed to load functional departments: ${funcRes.error.message}`,
-      };
-    }
 
     const orgMap = new Map((orgRes.data ?? []).map((r) => [r.name, r.id]));
-    const funcMap = new Map((funcRes.data ?? []).map((r) => [r.name, r.id]));
 
     const insertedPersonIds: string[] = [];
     const inviteFailures: { email: string; reason: string }[] = [];
@@ -67,10 +55,9 @@ export const commitEmployeeUpload = createServerFn({ method: "POST" })
 
     for (const row of rows) {
       const orgId = orgMap.get(row.org_department);
-      const funcId = funcMap.get(row.functional_department);
 
-      if (!orgId || !funcId) {
-        partialError = `Row for ${row.email}: department lookup failed (org=${row.org_department}, functional=${row.functional_department}).`;
+      if (!orgId) {
+        partialError = `Row for ${row.email}: org department lookup failed (${row.org_department}).`;
         break;
       }
 
@@ -121,23 +108,7 @@ export const commitEmployeeUpload = createServerFn({ method: "POST" })
         break;
       }
 
-      // 4. INSERT people_functional_departments
-      const funcLinkInsert = await supabaseAdmin
-        .from("people_functional_departments")
-        .insert({ person_id: personId, functional_department_id: funcId });
-
-      if (funcLinkInsert.error) {
-        await supabaseAdmin
-          .from("people_org_departments")
-          .delete()
-          .eq("person_id", personId);
-        await supabaseAdmin.from("people_roles").delete().eq("person_id", personId);
-        await supabaseAdmin.from("people").delete().eq("id", personId);
-        partialError = `Failed to link functional dept for ${row.email}: ${funcLinkInsert.error.message}`;
-        break;
-      }
-
-      // 5. Auth invite (failures don't abort the row)
+      // 4. Auth invite (failures don't abort the row)
       try {
         const invite = await supabaseAdmin.auth.admin.inviteUserByEmail(row.email);
         if (invite.error || !invite.data?.user?.id) {

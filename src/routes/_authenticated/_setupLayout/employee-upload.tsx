@@ -292,8 +292,68 @@ function EmployeeUploadPage() {
       if (collected.length > 0) {
         setErrors(collected);
         setModalOpen(true);
-      } else {
-        toast.success("All rows valid — insert step coming soon.");
+        return;
+      }
+
+      if (!person?.id) {
+        toast.error("Cannot identify uploader. Please re-login.");
+        return;
+      }
+
+      const payload = dataRows.map(({ values }) => ({
+        first_name: values.first_name.trim(),
+        last_name: values.last_name.trim(),
+        email: values.email.trim().toLowerCase(),
+        annual_salary: values.annual_salary.trim(),
+        employment_start_date: values.employment_start_date.trim(),
+        role: values.role.trim().toLowerCase() as
+          | "ceo"
+          | "manager"
+          | "hr_rep"
+          | "employee",
+        org_department: values.org_department.trim(),
+        functional_department: values.functional_department.trim(),
+      }));
+
+      setIsCommitting(true);
+      try {
+        const result = await commitFn({
+          data: {
+            entity_id,
+            uploaded_by_person_id: person.id,
+            file_name: selectedFile.name,
+            rows: payload,
+          },
+        });
+
+        if (result.partialError) {
+          toast.error(
+            `${result.partialError} (${result.inserted} of ${payload.length} rows inserted before failure.)`,
+          );
+        } else {
+          toast.success(
+            `${result.inserted} employees uploaded successfully. Invite emails sent.`,
+          );
+          setSelectedFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+
+        if (result.inviteFailures.length > 0) {
+          const preview = result.inviteFailures
+            .slice(0, 3)
+            .map((f) => f.email)
+            .join(", ");
+          const more =
+            result.inviteFailures.length > 3
+              ? ` and ${result.inviteFailures.length - 3} more`
+              : "";
+          toast.warning(`Invite email failed for: ${preview}${more}.`);
+        }
+      } catch (commitErr) {
+        console.error("[EmployeeUpload] commit error", commitErr);
+        toast.error("Failed to upload employees. Please try again.");
+      } finally {
+        setIsCommitting(false);
       }
     } catch (err) {
       console.error("[EmployeeUpload] parse error", err);

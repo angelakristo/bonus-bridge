@@ -1,3 +1,7 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical } from "lucide-react";
+
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -24,7 +28,54 @@ const TYPE_LABEL: Record<string, string> = {
   benchmark: "Benchmark",
 };
 
-export function KpiCard({ kpi }: { kpi: KpiCardData }) {
+export type KpiCardSource = "library" | "corporate" | "department";
+
+type Props = {
+  kpi: KpiCardData;
+  /** Which panel this card lives in — used for drag data. */
+  source: KpiCardSource;
+  /** Unique sortable id — must be unique across the entire DndContext. */
+  sortableId: string;
+};
+
+export function DraggableKpiCard({ kpi, source, sortableId }: Props) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: sortableId,
+    data: { kpi, source },
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.4 : 1,
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      <KpiCardInner kpi={kpi} dragListeners={listeners} />
+    </div>
+  );
+}
+
+/** Static (non-draggable) variant — used for the drag overlay. */
+export function KpiCardOverlay({ kpi }: { kpi: KpiCardData }) {
+  return <KpiCardInner kpi={kpi} />;
+}
+
+function KpiCardInner({
+  kpi,
+  dragListeners,
+}: {
+  kpi: KpiCardData;
+  dragListeners?: Record<string, unknown>;
+}) {
   const ds = DRIVER_STYLE[kpi.driver] ?? DRIVER_STYLE.growth;
   const isBinary = kpi.kpi_type === "binary";
 
@@ -44,10 +95,19 @@ export function KpiCard({ kpi }: { kpi: KpiCardData }) {
   }
 
   return (
-    <Card className="shadow-sm">
+    <Card className="shadow-sm cursor-grab active:cursor-grabbing">
       <CardContent className="p-4 space-y-2">
-        <p className="text-sm font-semibold leading-tight">{kpi.title}</p>
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="flex items-start gap-2">
+          <button
+            type="button"
+            className="mt-0.5 shrink-0 text-muted-foreground hover:text-foreground touch-none"
+            {...(dragListeners as React.HTMLAttributes<HTMLButtonElement> | undefined)}
+          >
+            <GripVertical className="h-4 w-4" />
+          </button>
+          <p className="text-sm font-semibold leading-tight">{kpi.title}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5 pl-6">
           <Badge variant="outline" className={cn("text-xs font-medium border-0", ds.bg, ds.text)}>
             {ds.label}
           </Badge>
@@ -55,7 +115,7 @@ export function KpiCard({ kpi }: { kpi: KpiCardData }) {
             {TYPE_LABEL[kpi.kpi_type]}
           </Badge>
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground pl-6">
           Year-End Target: <span className="font-medium text-foreground">{targetDisplay}</span>
         </p>
       </CardContent>

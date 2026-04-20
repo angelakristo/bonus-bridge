@@ -34,6 +34,7 @@ export const STEPS: SetupStep[] = [
     key: "set_driver_weightings",
     title: "Set Driver Weightings",
     description: "Allocate % weight to Growth, Efficiency and Culture.",
+    route: "/driver-weightings",
   },
   {
     key: "configure_corporate_kpis",

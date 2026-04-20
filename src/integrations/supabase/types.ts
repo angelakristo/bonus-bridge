@@ -894,7 +894,7 @@ export type Database = {
           created_at: string
           email: string
           employment_start_date: string | null
-          entity_id: string
+          entity_id: string | null
           first_name: string
           id: string
           is_active: boolean
@@ -906,7 +906,7 @@ export type Database = {
           created_at?: string
           email: string
           employment_start_date?: string | null
-          entity_id: string
+          entity_id?: string | null
           first_name: string
           id?: string
           is_active?: boolean
@@ -918,7 +918,7 @@ export type Database = {
           created_at?: string
           email?: string
           employment_start_date?: string | null
-          entity_id?: string
+          entity_id?: string | null
           first_name?: string
           id?: string
           is_active?: boolean

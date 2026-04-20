@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedRegisterEntityRouteImport } from './routes/_authenticated/register-entity'
 import { Route as AuthenticatedOrgDepartmentsRouteImport } from './routes/_authenticated/org-departments'
+import { Route as AuthenticatedEmployeeUploadRouteImport } from './routes/_authenticated/employee-upload'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 
 const LoginRoute = LoginRouteImport.update({
@@ -48,6 +49,12 @@ const AuthenticatedOrgDepartmentsRoute =
     path: '/org-departments',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedEmployeeUploadRoute =
+  AuthenticatedEmployeeUploadRouteImport.update({
+    id: '/employee-upload',
+    path: '/employee-upload',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -58,6 +65,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/employee-upload': typeof AuthenticatedEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/setup': typeof AuthenticatedSetupRoute
@@ -66,6 +74,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/employee-upload': typeof AuthenticatedEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/setup': typeof AuthenticatedSetupRoute
@@ -76,6 +85,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/employee-upload': typeof AuthenticatedEmployeeUploadRoute
   '/_authenticated/org-departments': typeof AuthenticatedOrgDepartmentsRoute
   '/_authenticated/register-entity': typeof AuthenticatedRegisterEntityRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
@@ -86,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
     | '/setup'
@@ -94,6 +105,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/dashboard'
+    | '/employee-upload'
     | '/org-departments'
     | '/register-entity'
     | '/setup'
@@ -103,6 +115,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/dashboard'
+    | '/_authenticated/employee-upload'
     | '/_authenticated/org-departments'
     | '/_authenticated/register-entity'
     | '/_authenticated/setup'
@@ -158,6 +171,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrgDepartmentsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/employee-upload': {
+      id: '/_authenticated/employee-upload'
+      path: '/employee-upload'
+      fullPath: '/employee-upload'
+      preLoaderRoute: typeof AuthenticatedEmployeeUploadRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -170,6 +190,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedEmployeeUploadRoute: typeof AuthenticatedEmployeeUploadRoute
   AuthenticatedOrgDepartmentsRoute: typeof AuthenticatedOrgDepartmentsRoute
   AuthenticatedRegisterEntityRoute: typeof AuthenticatedRegisterEntityRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
@@ -177,6 +198,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedEmployeeUploadRoute: AuthenticatedEmployeeUploadRoute,
   AuthenticatedOrgDepartmentsRoute: AuthenticatedOrgDepartmentsRoute,
   AuthenticatedRegisterEntityRoute: AuthenticatedRegisterEntityRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,

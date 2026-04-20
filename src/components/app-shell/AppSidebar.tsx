@@ -39,7 +39,7 @@ const NAV_ITEMS: NavItem[] = [
   { title: "Corporate KPIs", url: "/corporate-kpis", icon: Target, roles: ["ceo"] },
   { title: "Bonus Schemes", url: "/bonus-schemes", icon: Wallet, roles: ["ceo"] },
   { title: "Setup", url: "/setup", icon: Settings, roles: ["ceo", "hr_rep"] },
-  { title: "Upload Data", url: "/uploads", icon: Upload, roles: ["ceo", "hr_rep"] },
+  { title: "Upload Data", url: "/employee-upload", icon: Upload, roles: ["ceo", "hr_rep"] },
 ];
 
 function hasAnyRole(userRoles: UserRole[], allowed: UserRole[]) {

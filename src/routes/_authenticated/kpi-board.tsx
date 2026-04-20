@@ -1,6 +1,24 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useCallback } from "react";
 import { Plus, Library, Building2, Briefcase, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import {
+  DndContext,
+  DragOverlay,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  useDroppable,
+  type DragStartEvent,
+  type DragEndEvent,
+  type DragOverEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+  arrayMove,
+} from "@dnd-kit/sortable";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
@@ -16,7 +34,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { KpiCard, type KpiCardData } from "@/components/kpi/KpiCard";
+import {
+  DraggableKpiCard,
+  KpiCardOverlay,
+  type KpiCardData,
+  type KpiCardSource,
+} from "@/components/kpi/KpiCard";
 import { AddKpiModal, type KpiLevel } from "@/components/kpi/AddKpiModal";
 
 export const Route = createFileRoute("/_authenticated/kpi-board")({
@@ -28,6 +51,33 @@ export const Route = createFileRoute("/_authenticated/kpi-board")({
 /* ------------------------------------------------------------------ */
 
 type OrgDept = { id: string; name: string };
+
+/* prefix helpers — each card needs a globally unique sortable id */
+const LIB_PREFIX = "lib_";
+const CORP_PREFIX = "corp_";
+const DEPT_PREFIX = "dept_";
+
+/* ------------------------------------------------------------------ */
+/*  Droppable wrapper                                                  */
+/* ------------------------------------------------------------------ */
+
+function DroppableColumn({
+  id,
+  children,
+}: {
+  id: string;
+  children: React.ReactNode;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id });
+  return (
+    <div
+      ref={setNodeRef}
+      className={isOver ? "ring-2 ring-primary/40 rounded-lg transition-shadow" : "transition-shadow"}
+    >
+      {children}
+    </div>
+  );
+}
 
 /* ------------------------------------------------------------------ */
 /*  Data-fetching helpers                                              */
@@ -65,7 +115,6 @@ async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCa
     } | null;
     if (!def) continue;
 
-    // fetch year-end target
     const { data: tgt } = await supabase
       .from("corporate_kpi_targets")
       .select("target_value, target_binary")
@@ -138,6 +187,104 @@ async function fetchOrgDepts(entityId: string): Promise<OrgDept[]> {
 }
 
 /* ------------------------------------------------------------------ */
+/*  DB mutation helpers                                                */
+/* ------------------------------------------------------------------ */
+
+async function insertCorporateKpi(
+  entityId: string,
+  kpiDefId: string,
+  year: number,
+  displayOrder: number,
+) {
+  // Check duplicate
+  const { count } = await supabase
+    .from("corporate_kpis")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_id", entityId)
+    .eq("kpi_definition_id", kpiDefId)
+    .eq("year", year);
+  if ((count ?? 0) > 0) throw new Error("DUPLICATE");
+
+  const { data, error } = await supabase
+    .from("corporate_kpis")
+    .insert({ entity_id: entityId, kpi_definition_id: kpiDefId, year, display_order: displayOrder })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+async function insertDepartmentKpi(
+  entityId: string,
+  kpiDefId: string,
+  year: number,
+  orgDeptId: string,
+  displayOrder: number,
+) {
+  const { count } = await supabase
+    .from("department_kpis")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_id", entityId)
+    .eq("kpi_definition_id", kpiDefId)
+    .eq("year", year)
+    .eq("org_department_id", orgDeptId);
+  if ((count ?? 0) > 0) throw new Error("DUPLICATE");
+
+  const { data, error } = await supabase
+    .from("department_kpis")
+    .insert({
+      entity_id: entityId,
+      kpi_definition_id: kpiDefId,
+      year,
+      display_order: displayOrder,
+      org_department_id: orgDeptId,
+    })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id;
+}
+
+async function persistCorpOrder(entityId: string, year: number, orderedDefIds: string[]) {
+  // Fetch all corporate_kpi rows for this entity/year to map def id → row id
+  const { data } = await supabase
+    .from("corporate_kpis")
+    .select("id, kpi_definition_id")
+    .eq("entity_id", entityId)
+    .eq("year", year);
+  if (!data) return;
+  const byDef = new Map(data.map((r) => [r.kpi_definition_id, r.id]));
+  for (let i = 0; i < orderedDefIds.length; i++) {
+    const rowId = byDef.get(orderedDefIds[i]);
+    if (rowId) {
+      await supabase.from("corporate_kpis").update({ display_order: i + 1 }).eq("id", rowId);
+    }
+  }
+}
+
+async function persistDeptOrder(
+  entityId: string,
+  year: number,
+  orgDeptId: string,
+  orderedDefIds: string[],
+) {
+  const { data } = await supabase
+    .from("department_kpis")
+    .select("id, kpi_definition_id")
+    .eq("entity_id", entityId)
+    .eq("year", year)
+    .eq("org_department_id", orgDeptId);
+  if (!data) return;
+  const byDef = new Map(data.map((r) => [r.kpi_definition_id, r.id]));
+  for (let i = 0; i < orderedDefIds.length; i++) {
+    const rowId = byDef.get(orderedDefIds[i]);
+    if (rowId) {
+      await supabase.from("department_kpis").update({ display_order: i + 1 }).eq("id", rowId);
+    }
+  }
+}
+
+/* ------------------------------------------------------------------ */
 /*  Page component                                                     */
 /* ------------------------------------------------------------------ */
 
@@ -166,6 +313,10 @@ function KpiBoardPage() {
   // Modal
   const [modalOpen, setModalOpen] = useState(false);
   const [modalLevel, setModalLevel] = useState<KpiLevel>("corporate");
+
+  // DnD
+  const [activeKpi, setActiveKpi] = useState<KpiCardData | null>(null);
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
 
   /* ---- loaders ---- */
 
@@ -237,143 +388,306 @@ function KpiBoardPage() {
     setModalOpen(true);
   };
 
+  /* ---- DnD handlers ---- */
+
+  const resolveContainer = (sortableId: string): KpiCardSource | null => {
+    if (sortableId.startsWith(LIB_PREFIX)) return "library";
+    if (sortableId.startsWith(CORP_PREFIX)) return "corporate";
+    if (sortableId.startsWith(DEPT_PREFIX)) return "department";
+    return null;
+  };
+
+  const stripPrefix = (sortableId: string) =>
+    sortableId.replace(LIB_PREFIX, "").replace(CORP_PREFIX, "").replace(DEPT_PREFIX, "");
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const data = event.active.data.current as { kpi: KpiCardData } | undefined;
+    setActiveKpi(data?.kpi ?? null);
+  };
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    setActiveKpi(null);
+    const { active, over } = event;
+    if (!over || !entity_id) return;
+
+    const sourceContainer = resolveContainer(String(active.id));
+    const activeData = active.data.current as { kpi: KpiCardData; source: KpiCardSource } | undefined;
+    if (!activeData) return;
+
+    // Determine target container: either from the over item's id prefix or the droppable column id
+    let targetContainer: KpiCardSource | null = resolveContainer(String(over.id));
+    if (!targetContainer) {
+      // over.id might be a droppable column id like "corporate-column"
+      if (String(over.id) === "corporate-column") targetContainer = "corporate";
+      else if (String(over.id) === "department-column") targetContainer = "department";
+    }
+    if (!targetContainer) return;
+
+    const kpiDefId = activeData.kpi.id;
+
+    // ---- Cross-container drop: Library/other → Board column ----
+    if (sourceContainer !== targetContainer && targetContainer !== "library") {
+      if (targetContainer === "corporate") {
+        handleDropToCorporate(activeData.kpi);
+      } else if (targetContainer === "department") {
+        handleDropToDepartment(activeData.kpi);
+      }
+      return;
+    }
+
+    // ---- Same-container reorder ----
+    if (sourceContainer === targetContainer && sourceContainer !== "library") {
+      const overDefId = stripPrefix(String(over.id));
+      if (kpiDefId === overDefId) return; // dropped on self
+
+      if (sourceContainer === "corporate") {
+        const oldIdx = corpKpis.findIndex((k) => k.id === kpiDefId);
+        const newIdx = corpKpis.findIndex((k) => k.id === overDefId);
+        if (oldIdx === -1 || newIdx === -1) return;
+        const reordered = arrayMove(corpKpis, oldIdx, newIdx);
+        setCorpKpis(reordered);
+        void persistCorpOrder(entity_id, selected_year, reordered.map((k) => k.id));
+      } else if (sourceContainer === "department") {
+        const oldIdx = deptKpis.findIndex((k) => k.id === kpiDefId);
+        const newIdx = deptKpis.findIndex((k) => k.id === overDefId);
+        if (oldIdx === -1 || newIdx === -1) return;
+        const reordered = arrayMove(deptKpis, oldIdx, newIdx);
+        setDeptKpis(reordered);
+        void persistDeptOrder(entity_id, selected_year, selectedDept, reordered.map((k) => k.id));
+      }
+    }
+  };
+
+  /* ---- Drop handlers with optimistic UI ---- */
+
+  const handleDropToCorporate = async (kpi: KpiCardData) => {
+    if (!entity_id) return;
+    // Optimistic add
+    const prev = [...corpKpis];
+    if (prev.some((k) => k.id === kpi.id)) {
+      toast.error("This KPI is already on the Corporate Board.");
+      return;
+    }
+    setCorpKpis([...prev, kpi]);
+    try {
+      await insertCorporateKpi(entity_id, kpi.id, selected_year, prev.length + 1);
+      toast.success("KPI added to Corporate Board.");
+      void loadCorporate(); // refresh with real targets
+    } catch (err) {
+      setCorpKpis(prev);
+      if (err instanceof Error && err.message === "DUPLICATE") {
+        toast.error("This KPI is already on the Corporate Board.");
+      } else {
+        toast.error("Failed to add KPI to Corporate Board.");
+        console.error(err);
+      }
+    }
+  };
+
+  const handleDropToDepartment = async (kpi: KpiCardData) => {
+    if (!entity_id || !selectedDept) return;
+    const prev = [...deptKpis];
+    if (prev.some((k) => k.id === kpi.id)) {
+      toast.error("This KPI is already on the Department Board.");
+      return;
+    }
+    setDeptKpis([...prev, kpi]);
+    try {
+      await insertDepartmentKpi(entity_id, kpi.id, selected_year, selectedDept, prev.length + 1);
+      toast.success("KPI added to Department Board.");
+      void loadDeptKpis();
+    } catch (err) {
+      setDeptKpis(prev);
+      if (err instanceof Error && err.message === "DUPLICATE") {
+        toast.error("This KPI is already on the Department Board.");
+      } else {
+        toast.error("Failed to add KPI to Department Board.");
+        console.error(err);
+      }
+    }
+  };
+
   if (!allowed) return null;
+
+  /* ---- sortable id lists ---- */
+  const libIds = library.map((k) => `${LIB_PREFIX}${k.id}`);
+  const corpIds = corpKpis.map((k) => `${CORP_PREFIX}${k.id}`);
+  const deptIds = deptKpis.map((k) => `${DEPT_PREFIX}${k.id}`);
 
   /* ---- render ---- */
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold tracking-tight">KPI Board</h1>
-        <span className="rounded-md bg-muted px-3 py-1 text-sm font-medium">{selected_year}</span>
-      </div>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="flex flex-col gap-4 p-4 md:p-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-bold tracking-tight">KPI Board</h1>
+          <span className="rounded-md bg-muted px-3 py-1 text-sm font-medium">{selected_year}</span>
+        </div>
 
-      {/* Three-column grid */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        {/* ---- 1. KPI Library ---- */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Library className="h-4 w-4 text-muted-foreground" />
-              KPI Library ({library.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-[calc(100vh-260px)] px-4 pb-4">
-              {libLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : library.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">No KPIs defined yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {library.map((k) => (
-                    <KpiCard key={k.id} kpi={k} />
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
-        {/* ---- 2. Corporate KPIs ---- */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+        {/* Three-column grid */}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          {/* ---- 1. KPI Library ---- */}
+          <Card className="flex flex-col">
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
-                <Building2 className="h-4 w-4 text-muted-foreground" />
-                Corporate KPIs ({corpKpis.length}/10)
+                <Library className="h-4 w-4 text-muted-foreground" />
+                KPI Library ({library.length})
               </CardTitle>
-              <Button size="sm" variant="outline" onClick={() => openModal("corporate")}>
-                <Plus className="h-4 w-4" />
-                Add KPI
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-[calc(100vh-260px)] px-4 pb-4">
-              {corpLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                </div>
-              ) : corpKpis.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">No corporate KPIs yet.</p>
-              ) : (
-                <div className="space-y-2">
-                  {corpKpis.map((k) => (
-                    <KpiCard key={k.id} kpi={k} />
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent className="flex-1 p-0">
+              <ScrollArea className="h-[calc(100vh-260px)] px-4 pb-4">
+                {libLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                  </div>
+                ) : library.length === 0 ? (
+                  <p className="py-8 text-center text-sm text-muted-foreground">No KPIs defined yet.</p>
+                ) : (
+                  <SortableContext items={libIds} strategy={verticalListSortingStrategy}>
+                    <div className="space-y-2">
+                      {library.map((k) => (
+                        <DraggableKpiCard
+                          key={k.id}
+                          kpi={k}
+                          source="library"
+                          sortableId={`${LIB_PREFIX}${k.id}`}
+                        />
+                      ))}
+                    </div>
+                  </SortableContext>
+                )}
+              </ScrollArea>
+            </CardContent>
+          </Card>
 
-        {/* ---- 3. Department KPIs ---- */}
-        <Card className="flex flex-col">
-          <CardHeader className="pb-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Briefcase className="h-4 w-4 text-muted-foreground" />
-                Department KPIs ({deptKpis.length}/10)
-              </CardTitle>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={!selectedDept}
-                onClick={() => openModal("department")}
-              >
-                <Plus className="h-4 w-4" />
-                Add KPI
-              </Button>
-            </div>
-            {orgDepts.length > 0 && (
-              <Select value={selectedDept} onValueChange={setSelectedDept}>
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
-                <SelectContent>
-                  {orgDepts.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>
-                      {d.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </CardHeader>
-          <CardContent className="flex-1 p-0">
-            <ScrollArea className="h-[calc(100vh-320px)] px-4 pb-4">
-              {deptLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          {/* ---- 2. Corporate KPIs ---- */}
+          <DroppableColumn id="corporate-column">
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    Corporate KPIs ({corpKpis.length}/10)
+                  </CardTitle>
+                  <Button size="sm" variant="outline" onClick={() => openModal("corporate")}>
+                    <Plus className="h-4 w-4" />
+                    Add KPI
+                  </Button>
                 </div>
-              ) : deptKpis.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  {selectedDept ? "No KPIs for this department yet." : "Select a department."}
-                </p>
-              ) : (
-                <div className="space-y-2">
-                  {deptKpis.map((k) => (
-                    <KpiCard key={k.id} kpi={k} />
-                  ))}
+              </CardHeader>
+              <CardContent className="flex-1 p-0">
+                <ScrollArea className="h-[calc(100vh-260px)] px-4 pb-4">
+                  {corpLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : corpKpis.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      No corporate KPIs yet. Drag from the Library or click Add KPI.
+                    </p>
+                  ) : (
+                    <SortableContext items={corpIds} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {corpKpis.map((k) => (
+                          <DraggableKpiCard
+                            key={k.id}
+                            kpi={k}
+                            source="corporate"
+                            sortableId={`${CORP_PREFIX}${k.id}`}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </DroppableColumn>
+
+          {/* ---- 3. Department KPIs ---- */}
+          <DroppableColumn id="department-column">
+            <Card className="flex flex-col">
+              <CardHeader className="pb-3 space-y-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Briefcase className="h-4 w-4 text-muted-foreground" />
+                    Department KPIs ({deptKpis.length}/10)
+                  </CardTitle>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!selectedDept}
+                    onClick={() => openModal("department")}
+                  >
+                    <Plus className="h-4 w-4" />
+                    Add KPI
+                  </Button>
                 </div>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+                {orgDepts.length > 0 && (
+                  <Select value={selectedDept} onValueChange={setSelectedDept}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {orgDepts.map((d) => (
+                        <SelectItem key={d.id} value={d.id}>
+                          {d.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </CardHeader>
+              <CardContent className="flex-1 p-0">
+                <ScrollArea className="h-[calc(100vh-320px)] px-4 pb-4">
+                  {deptLoading ? (
+                    <div className="flex items-center justify-center py-12">
+                      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : deptKpis.length === 0 ? (
+                    <p className="py-8 text-center text-sm text-muted-foreground">
+                      {selectedDept ? "No KPIs for this department yet. Drag from the Library." : "Select a department."}
+                    </p>
+                  ) : (
+                    <SortableContext items={deptIds} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2">
+                        {deptKpis.map((k) => (
+                          <DraggableKpiCard
+                            key={k.id}
+                            kpi={k}
+                            source="department"
+                            sortableId={`${DEPT_PREFIX}${k.id}`}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  )}
+                </ScrollArea>
+              </CardContent>
+            </Card>
+          </DroppableColumn>
+        </div>
+
+        {/* Drag overlay */}
+        <DragOverlay>
+          {activeKpi ? <KpiCardOverlay kpi={activeKpi} /> : null}
+        </DragOverlay>
+
+        {/* Add KPI Modal */}
+        <AddKpiModal
+          open={modalOpen}
+          onOpenChange={setModalOpen}
+          level={modalLevel}
+          onSuccess={handleAddSuccess}
+          org_department_id={modalLevel === "department" ? selectedDept : null}
+        />
       </div>
-
-      {/* Add KPI Modal */}
-      <AddKpiModal
-        open={modalOpen}
-        onOpenChange={setModalOpen}
-        level={modalLevel}
-        onSuccess={handleAddSuccess}
-        org_department_id={modalLevel === "department" ? selectedDept : null}
-      />
-    </div>
+    </DndContext>
   );
 }

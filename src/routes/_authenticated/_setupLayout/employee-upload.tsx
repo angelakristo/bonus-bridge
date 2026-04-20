@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx-js-style";
-import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2 } from "lucide-react";
+import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -12,6 +12,7 @@ import { commitEmployeeUpload } from "@/integrations/supabase/employee-upload.fu
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadValidationModal } from "@/components/employee-upload/UploadValidationModal";
+import { AddEmployeeManuallyModal } from "@/components/employee-upload/AddEmployeeManuallyModal";
 
 export const Route = createFileRoute("/_authenticated/_setupLayout/employee-upload")({
   component: EmployeeUploadPage,
@@ -114,6 +115,7 @@ function EmployeeUploadPage() {
   const [isCommitting, setIsCommitting] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [manualOpen, setManualOpen] = useState(false);
 
   if (!allowed) {
     return (
@@ -443,7 +445,35 @@ function EmployeeUploadPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader>
+          <CardTitle>Or — Add Employees Manually</CardTitle>
+          <CardDescription>
+            Prefer to enter employees one at a time? Add them through a quick form
+            instead of using the Excel template.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="outline"
+            onClick={() => setManualOpen(true)}
+            disabled={!entityReady || !person?.id}
+          >
+            <UserPlus className="h-4 w-4" />
+            Add Employee Manually
+          </Button>
+        </CardContent>
+      </Card>
+
       <UploadValidationModal open={modalOpen} onOpenChange={setModalOpen} errors={errors} />
+      {entity_id && person?.id && (
+        <AddEmployeeManuallyModal
+          open={manualOpen}
+          onOpenChange={setManualOpen}
+          entityId={entity_id}
+          uploaderPersonId={person.id}
+        />
+      )}
     </div>
   );
 }

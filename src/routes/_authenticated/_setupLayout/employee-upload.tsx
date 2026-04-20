@@ -409,7 +409,7 @@ function EmployeeUploadPage() {
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isValidating}
+              disabled={isValidating || isCommitting}
             >
               <FileSpreadsheet className="h-4 w-4" />
               Choose file
@@ -421,14 +421,14 @@ function EmployeeUploadPage() {
           <div>
             <Button
               onClick={handleUpload}
-              disabled={!selectedFile || isValidating || !entityReady}
+              disabled={!selectedFile || isValidating || isCommitting || !entityReady}
             >
-              {isValidating ? (
+              {isValidating || isCommitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <UploadIcon className="h-4 w-4" />
               )}
-              {isValidating ? "Validating…" : "Upload"}
+              {isValidating ? "Validating…" : isCommitting ? "Uploading…" : "Upload"}
             </Button>
             {!entityReady && (
               <p className="mt-2 text-xs text-muted-foreground">Loading entity…</p>

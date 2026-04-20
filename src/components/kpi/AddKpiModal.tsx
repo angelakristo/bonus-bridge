@@ -1,5 +1,10 @@
 import { useState } from "react";
+import { toast } from "sonner";
 
+import { useAuth } from "@/contexts/AuthContext";
+import { useEntity } from "@/contexts/EntityContext";
+import { useYear } from "@/contexts/YearContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
 
 export type KpiLevel = "corporate" | "department" | "individual";
 export type KpiType = "progressive" | "binary" | "benchmark";

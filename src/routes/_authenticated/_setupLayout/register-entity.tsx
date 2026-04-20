@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-export const Route = createFileRoute("/_authenticated/_setup/register-entity")({
+export const Route = createFileRoute("/_authenticated/_setupLayout/register-entity")({
   component: RegisterEntityPage,
 });
 

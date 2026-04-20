@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx-js-style";
 import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
 import { supabase } from "@/integrations/supabase/client";
+import { commitEmployeeUpload } from "@/integrations/supabase/employee-upload.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadValidationModal } from "@/components/employee-upload/UploadValidationModal";
@@ -105,13 +107,15 @@ const FIELD_ORDER: Record<string, number> = HEADERS.reduce(
 );
 
 function EmployeeUploadPage() {
-  const { roles } = useAuth();
+  const { roles, person } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
   const allowed = roles.includes("hr_rep") || roles.includes("ceo");
+  const commitFn = useServerFn(commitEmployeeUpload);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 
@@ -288,8 +292,68 @@ function EmployeeUploadPage() {
       if (collected.length > 0) {
         setErrors(collected);
         setModalOpen(true);
-      } else {
-        toast.success("All rows valid — insert step coming soon.");
+        return;
+      }
+
+      if (!person?.id) {
+        toast.error("Cannot identify uploader. Please re-login.");
+        return;
+      }
+
+      const payload = dataRows.map(({ values }) => ({
+        first_name: values.first_name.trim(),
+        last_name: values.last_name.trim(),
+        email: values.email.trim().toLowerCase(),
+        annual_salary: values.annual_salary.trim(),
+        employment_start_date: values.employment_start_date.trim(),
+        role: values.role.trim().toLowerCase() as
+          | "ceo"
+          | "manager"
+          | "hr_rep"
+          | "employee",
+        org_department: values.org_department.trim(),
+        functional_department: values.functional_department.trim(),
+      }));
+
+      setIsCommitting(true);
+      try {
+        const result = await commitFn({
+          data: {
+            entity_id,
+            uploaded_by_person_id: person.id,
+            file_name: selectedFile.name,
+            rows: payload,
+          },
+        });
+
+        if (result.partialError) {
+          toast.error(
+            `${result.partialError} (${result.inserted} of ${payload.length} rows inserted before failure.)`,
+          );
+        } else {
+          toast.success(
+            `${result.inserted} employees uploaded successfully. Invite emails sent.`,
+          );
+          setSelectedFile(null);
+          if (fileInputRef.current) fileInputRef.current.value = "";
+        }
+
+        if (result.inviteFailures.length > 0) {
+          const preview = result.inviteFailures
+            .slice(0, 3)
+            .map((f) => f.email)
+            .join(", ");
+          const more =
+            result.inviteFailures.length > 3
+              ? ` and ${result.inviteFailures.length - 3} more`
+              : "";
+          toast.warning(`Invite email failed for: ${preview}${more}.`);
+        }
+      } catch (commitErr) {
+        console.error("[EmployeeUpload] commit error", commitErr);
+        toast.error("Failed to upload employees. Please try again.");
+      } finally {
+        setIsCommitting(false);
       }
     } catch (err) {
       console.error("[EmployeeUpload] parse error", err);
@@ -345,7 +409,7 @@ function EmployeeUploadPage() {
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isValidating}
+              disabled={isValidating || isCommitting}
             >
               <FileSpreadsheet className="h-4 w-4" />
               Choose file
@@ -357,14 +421,14 @@ function EmployeeUploadPage() {
           <div>
             <Button
               onClick={handleUpload}
-              disabled={!selectedFile || isValidating || !entityReady}
+              disabled={!selectedFile || isValidating || isCommitting || !entityReady}
             >
-              {isValidating ? (
+              {isValidating || isCommitting ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <UploadIcon className="h-4 w-4" />
               )}
-              {isValidating ? "Validating…" : "Upload"}
+              {isValidating ? "Validating…" : isCommitting ? "Uploading…" : "Upload"}
             </Button>
             {!entityReady && (
               <p className="mt-2 text-xs text-muted-foreground">Loading entity…</p>

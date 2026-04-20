@@ -480,20 +480,25 @@ function KpiBoardPage() {
 
   const handleDropToCorporate = async (kpi: KpiCardData) => {
     if (!entity_id) return;
-    // Optimistic add
     const prev = [...corpKpis];
     if (prev.some((k) => k.id === kpi.id)) {
       toast.error("This KPI is already on the Corporate Board.");
+      return;
+    }
+    if (prev.length >= MAX_KPIS_PER_BOARD) {
+      toast.error("Corporate KPI limit reached. Maximum 10 KPIs per board.");
       return;
     }
     setCorpKpis([...prev, kpi]);
     try {
       await insertCorporateKpi(entity_id, kpi.id, selected_year, prev.length + 1);
       toast.success("KPI added to Corporate Board.");
-      void loadCorporate(); // refresh with real targets
+      void loadCorporate();
     } catch (err) {
       setCorpKpis(prev);
-      if (err instanceof Error && err.message === "DUPLICATE") {
+      if (err instanceof Error && err.message === "LIMIT") {
+        toast.error("Corporate KPI limit reached. Maximum 10 KPIs per board.");
+      } else if (err instanceof Error && err.message === "DUPLICATE") {
         toast.error("This KPI is already on the Corporate Board.");
       } else {
         toast.error("Failed to add KPI to Corporate Board.");
@@ -509,6 +514,10 @@ function KpiBoardPage() {
       toast.error("This KPI is already on the Department Board.");
       return;
     }
+    if (prev.length >= MAX_KPIS_PER_BOARD) {
+      toast.error("Department KPI limit reached. Maximum 10 KPIs per board.");
+      return;
+    }
     setDeptKpis([...prev, kpi]);
     try {
       await insertDepartmentKpi(entity_id, kpi.id, selected_year, selectedDept, prev.length + 1);
@@ -516,7 +525,9 @@ function KpiBoardPage() {
       void loadDeptKpis();
     } catch (err) {
       setDeptKpis(prev);
-      if (err instanceof Error && err.message === "DUPLICATE") {
+      if (err instanceof Error && err.message === "LIMIT") {
+        toast.error("Department KPI limit reached. Maximum 10 KPIs per board.");
+      } else if (err instanceof Error && err.message === "DUPLICATE") {
         toast.error("This KPI is already on the Department Board.");
       } else {
         toast.error("Failed to add KPI to Department Board.");

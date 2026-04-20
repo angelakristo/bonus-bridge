@@ -34,6 +34,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DraggableKpiCard,
   KpiCardOverlay,
@@ -190,12 +191,22 @@ async function fetchOrgDepts(entityId: string): Promise<OrgDept[]> {
 /*  DB mutation helpers                                                */
 /* ------------------------------------------------------------------ */
 
+const MAX_KPIS_PER_BOARD = 10;
+
 async function insertCorporateKpi(
   entityId: string,
   kpiDefId: string,
   year: number,
   displayOrder: number,
 ) {
+  // Check board limit
+  const { count: totalCount } = await supabase
+    .from("corporate_kpis")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_id", entityId)
+    .eq("year", year);
+  if ((totalCount ?? 0) >= MAX_KPIS_PER_BOARD) throw new Error("LIMIT");
+
   // Check duplicate
   const { count } = await supabase
     .from("corporate_kpis")
@@ -221,6 +232,14 @@ async function insertDepartmentKpi(
   orgDeptId: string,
   displayOrder: number,
 ) {
+  const { count: totalCount } = await supabase
+    .from("department_kpis")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_id", entityId)
+    .eq("year", year)
+    .eq("org_department_id", orgDeptId);
+  if ((totalCount ?? 0) >= MAX_KPIS_PER_BOARD) throw new Error("LIMIT");
+
   const { count } = await supabase
     .from("department_kpis")
     .select("id", { count: "exact", head: true })
@@ -462,20 +481,25 @@ function KpiBoardPage() {
 
   const handleDropToCorporate = async (kpi: KpiCardData) => {
     if (!entity_id) return;
-    // Optimistic add
     const prev = [...corpKpis];
     if (prev.some((k) => k.id === kpi.id)) {
       toast.error("This KPI is already on the Corporate Board.");
+      return;
+    }
+    if (prev.length >= MAX_KPIS_PER_BOARD) {
+      toast.error("Corporate KPI limit reached. Maximum 10 KPIs per board.");
       return;
     }
     setCorpKpis([...prev, kpi]);
     try {
       await insertCorporateKpi(entity_id, kpi.id, selected_year, prev.length + 1);
       toast.success("KPI added to Corporate Board.");
-      void loadCorporate(); // refresh with real targets
+      void loadCorporate();
     } catch (err) {
       setCorpKpis(prev);
-      if (err instanceof Error && err.message === "DUPLICATE") {
+      if (err instanceof Error && err.message === "LIMIT") {
+        toast.error("Corporate KPI limit reached. Maximum 10 KPIs per board.");
+      } else if (err instanceof Error && err.message === "DUPLICATE") {
         toast.error("This KPI is already on the Corporate Board.");
       } else {
         toast.error("Failed to add KPI to Corporate Board.");
@@ -491,6 +515,10 @@ function KpiBoardPage() {
       toast.error("This KPI is already on the Department Board.");
       return;
     }
+    if (prev.length >= MAX_KPIS_PER_BOARD) {
+      toast.error("Department KPI limit reached. Maximum 10 KPIs per board.");
+      return;
+    }
     setDeptKpis([...prev, kpi]);
     try {
       await insertDepartmentKpi(entity_id, kpi.id, selected_year, selectedDept, prev.length + 1);
@@ -498,7 +526,9 @@ function KpiBoardPage() {
       void loadDeptKpis();
     } catch (err) {
       setDeptKpis(prev);
-      if (err instanceof Error && err.message === "DUPLICATE") {
+      if (err instanceof Error && err.message === "LIMIT") {
+        toast.error("Department KPI limit reached. Maximum 10 KPIs per board.");
+      } else if (err instanceof Error && err.message === "DUPLICATE") {
         toast.error("This KPI is already on the Department Board.");
       } else {
         toast.error("Failed to add KPI to Department Board.");
@@ -508,6 +538,9 @@ function KpiBoardPage() {
   };
 
   if (!allowed) return null;
+
+  const corpAtLimit = corpKpis.length >= MAX_KPIS_PER_BOARD;
+  const deptAtLimit = deptKpis.length >= MAX_KPIS_PER_BOARD;
 
   /* ---- sortable id lists ---- */
   const libIds = library.map((k) => `${LIB_PREFIX}${k.id}`);
@@ -575,10 +608,28 @@ function KpiBoardPage() {
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     Corporate KPIs ({corpKpis.length}/10)
                   </CardTitle>
-                  <Button size="sm" variant="outline" onClick={() => openModal("corporate")}>
-                    <Plus className="h-4 w-4" />
-                    Add KPI
-                  </Button>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={corpAtLimit ? 0 : -1}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={corpAtLimit}
+                            onClick={() => openModal("corporate")}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add KPI
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {corpAtLimit && (
+                        <TooltipContent>
+                          Corporate KPI limit reached. Maximum 10 KPIs per board.
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
               </CardHeader>
               <CardContent className="flex-1 p-0">
@@ -619,15 +670,28 @@ function KpiBoardPage() {
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                     Department KPIs ({deptKpis.length}/10)
                   </CardTitle>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!selectedDept}
-                    onClick={() => openModal("department")}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add KPI
-                  </Button>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={deptAtLimit ? 0 : -1}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!selectedDept || deptAtLimit}
+                            onClick={() => openModal("department")}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add KPI
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {deptAtLimit && (
+                        <TooltipContent>
+                          Department KPI limit reached. Maximum 10 KPIs per board.
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 {orgDepts.length > 0 && (
                   <Select value={selectedDept} onValueChange={setSelectedDept}>

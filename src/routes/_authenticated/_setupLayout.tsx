@@ -10,7 +10,7 @@ import type { Database } from "@/integrations/supabase/types";
 
 type SetupStepStatus = Database["public"]["Enums"]["setup_step_status"];
 
-export const Route = createFileRoute("/_authenticated/_setup")({
+export const Route = createFileRoute("/_authenticated/_setupLayout")({
   component: SetupLayout,
 });
 

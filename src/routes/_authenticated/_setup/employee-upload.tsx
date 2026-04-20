@@ -26,7 +26,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 
-export const Route = createFileRoute("/_authenticated/employee-upload")({
+export const Route = createFileRoute("/_authenticated/_setup/employee-upload")({
   component: EmployeeUploadPage,
 });
 

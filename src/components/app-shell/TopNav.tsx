@@ -1,4 +1,6 @@
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
+
+import { ActionCentre } from "@/components/app-shell/ActionCentre";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useYear } from "@/contexts/YearContext";

@@ -49,7 +49,13 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   level: KpiLevel;
-  onSuccess: (values: AddKpiFormValues) => void;
+  onSuccess: () => void;
+  /** Required when level === "department" — the org department to attach the KPI to. */
+  org_department_id?: string | null;
+  /** Required when level === "department" — the functional department to attach the KPI to. */
+  functional_department_id?: string | null;
+  /** Required when level === "individual" — the person this KPI belongs to. */
+  person_id?: string | null;
 };
 
 const LEVEL_LABEL: Record<KpiLevel, string> = {

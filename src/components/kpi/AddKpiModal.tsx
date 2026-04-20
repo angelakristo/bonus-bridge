@@ -1,5 +1,10 @@
 import { useState } from "react";
+import { toast } from "sonner";
 
+import { useAuth } from "@/contexts/AuthContext";
+import { useEntity } from "@/contexts/EntityContext";
+import { useYear } from "@/contexts/YearContext";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { Loader2 } from "lucide-react";
 
 export type KpiLevel = "corporate" | "department" | "individual";
 export type KpiType = "progressive" | "binary" | "benchmark";
@@ -43,7 +49,13 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   level: KpiLevel;
-  onSuccess: (values: AddKpiFormValues) => void;
+  onSuccess: () => void;
+  /** Required when level === "department" — the org department to attach the KPI to. */
+  org_department_id?: string | null;
+  /** Required when level === "department" — the functional department to attach the KPI to. */
+  functional_department_id?: string | null;
+  /** Required when level === "individual" — the person this KPI belongs to. */
+  person_id?: string | null;
 };
 
 const LEVEL_LABEL: Record<KpiLevel, string> = {
@@ -71,27 +83,199 @@ const EMPTY: AddKpiFormValues = {
   binary_targets: { midyear: false, yearend: false },
 };
 
-export function AddKpiModal({ open, onOpenChange, level, onSuccess }: Props) {
+export function AddKpiModal({
+  open,
+  onOpenChange,
+  level,
+  onSuccess,
+  org_department_id = null,
+  functional_department_id = null,
+  person_id: target_person_id = null,
+}: Props) {
+  const { person } = useAuth();
+  const { entity_id } = useEntity();
+  const { selected_year } = useYear();
+
   const [values, setValues] = useState<AddKpiFormValues>(EMPTY);
   const [titleError, setTitleError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
 
   const update = <K extends keyof AddKpiFormValues>(
     key: K,
     value: AddKpiFormValues[K],
   ) => setValues((v) => ({ ...v, [key]: value }));
 
-  const handleSave = () => {
+  const buildNumericTargetRows = (fkName: string, fkValue: string) => {
+    const periodMap: Record<NumericTargetPeriod, "q1" | "q2" | "q3" | "q4" | "halfyear" | "fullyear"> = {
+      q1: "q1",
+      q2: "q2",
+      q3: "q3",
+      q4: "q4",
+      midyear: "halfyear",
+      yearend: "fullyear",
+    };
+    const rows: Record<string, unknown>[] = [];
+    for (const f of NUMERIC_TARGET_FIELDS) {
+      const raw = values.numeric_targets[f.key].trim();
+      if (raw === "") continue;
+      const num = Number(raw);
+      if (!Number.isFinite(num)) continue;
+      rows.push({ [fkName]: fkValue, period: periodMap[f.key], target_value: num });
+    }
+    return rows;
+  };
+
+  const buildBinaryTargetRows = (fkName: string, fkValue: string) => [
+    { [fkName]: fkValue, period: "halfyear", target_binary: values.binary_targets.midyear },
+    { [fkName]: fkValue, period: "fullyear", target_binary: values.binary_targets.yearend },
+  ];
+
+  const handleSave = async () => {
     if (!values.title.trim()) {
       setTitleError("KPI Title is required.");
       return;
     }
     setTitleError(null);
-    onSuccess(values);
-    setValues(EMPTY);
-    onOpenChange(false);
+
+    if (!entity_id) return toast.error("No entity selected.");
+    if (!person?.id) return toast.error("Cannot identify current user.");
+    if (level === "department" && !org_department_id && !functional_department_id) {
+      return toast.error("Department context is required.");
+    }
+    if (level === "individual" && !target_person_id) {
+      return toast.error("Person context is required.");
+    }
+
+    setSaving(true);
+    try {
+      // 1. INSERT kpi_definitions
+      const defRes = await supabase
+        .from("kpi_definitions")
+        .insert({
+          entity_id,
+          title: values.title.trim(),
+          description: values.description.trim() || null,
+          kpi_type: values.kpi_type,
+          driver: values.driver,
+          unit: values.unit.trim() || null,
+          year: selected_year,
+          is_active: true,
+          created_by: person.id,
+        })
+        .select("id")
+        .single();
+      if (defRes.error || !defRes.data) {
+        throw new Error(defRes.error?.message ?? "Failed to insert KPI definition.");
+      }
+      const kpiDefinitionId = defRes.data.id;
+      const isBinary = values.kpi_type === "binary";
+
+      if (level === "corporate") {
+        const countRes = await supabase
+          .from("corporate_kpis")
+          .select("id", { count: "exact", head: true })
+          .eq("entity_id", entity_id)
+          .eq("year", selected_year);
+        if (countRes.error) throw new Error(countRes.error.message);
+        const display_order = (countRes.count ?? 0) + 1;
+
+        const corpRes = await supabase
+          .from("corporate_kpis")
+          .insert({ entity_id, kpi_definition_id: kpiDefinitionId, year: selected_year, display_order })
+          .select("id")
+          .single();
+        if (corpRes.error || !corpRes.data) throw new Error(corpRes.error?.message ?? "Failed to insert corporate KPI.");
+
+        const targetRows = isBinary
+          ? buildBinaryTargetRows("corporate_kpi_id", corpRes.data.id)
+          : buildNumericTargetRows("corporate_kpi_id", corpRes.data.id);
+        if (targetRows.length > 0) {
+          const tRes = await supabase.from("corporate_kpi_targets").insert(targetRows as never);
+          if (tRes.error) throw new Error(tRes.error.message);
+        }
+      } else if (level === "department") {
+        const filterCol = org_department_id ? "org_department_id" : "functional_department_id";
+        const filterVal = (org_department_id ?? functional_department_id) as string;
+        const countRes = await supabase
+          .from("department_kpis")
+          .select("id", { count: "exact", head: true })
+          .eq("entity_id", entity_id)
+          .eq("year", selected_year)
+          .eq(filterCol, filterVal);
+        if (countRes.error) throw new Error(countRes.error.message);
+        const display_order = (countRes.count ?? 0) + 1;
+
+        const deptRes = await supabase
+          .from("department_kpis")
+          .insert({
+            entity_id,
+            kpi_definition_id: kpiDefinitionId,
+            year: selected_year,
+            display_order,
+            org_department_id: org_department_id ?? null,
+            functional_department_id: functional_department_id ?? null,
+          })
+          .select("id")
+          .single();
+        if (deptRes.error || !deptRes.data) throw new Error(deptRes.error?.message ?? "Failed to insert department KPI.");
+
+        const targetRows = isBinary
+          ? buildBinaryTargetRows("department_kpi_id", deptRes.data.id)
+          : buildNumericTargetRows("department_kpi_id", deptRes.data.id);
+        if (targetRows.length > 0) {
+          const tRes = await supabase.from("department_kpi_targets").insert(targetRows as never);
+          if (tRes.error) throw new Error(tRes.error.message);
+        }
+      } else {
+        const countRes = await supabase
+          .from("individual_kpis")
+          .select("id", { count: "exact", head: true })
+          .eq("entity_id", entity_id)
+          .eq("year", selected_year)
+          .eq("person_id", target_person_id as string);
+        if (countRes.error) throw new Error(countRes.error.message);
+        const display_order = (countRes.count ?? 0) + 1;
+
+        const indRes = await supabase
+          .from("individual_kpis")
+          .insert({
+            entity_id,
+            person_id: target_person_id as string,
+            kpi_definition_id: kpiDefinitionId,
+            year: selected_year,
+            display_order,
+            status: "draft",
+            proposed_by: person.id,
+            is_active: true,
+          })
+          .select("id")
+          .single();
+        if (indRes.error || !indRes.data) throw new Error(indRes.error?.message ?? "Failed to insert individual KPI.");
+
+        const targetRows = isBinary
+          ? buildBinaryTargetRows("individual_kpi_id", indRes.data.id)
+          : buildNumericTargetRows("individual_kpi_id", indRes.data.id);
+        if (targetRows.length > 0) {
+          const tRes = await supabase.from("individual_kpi_targets").insert(targetRows as never);
+          if (tRes.error) throw new Error(tRes.error.message);
+        }
+      }
+
+      toast.success(`${LEVEL_LABEL[level]} KPI added.`);
+      onSuccess();
+      setValues(EMPTY);
+      onOpenChange(false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[AddKpiModal] save failed", err);
+      toast.error(`Failed to save KPI: ${msg}`);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleOpenChange = (next: boolean) => {
+    if (saving) return;
     if (!next) {
       setValues(EMPTY);
       setTitleError(null);
@@ -297,10 +481,13 @@ export function AddKpiModal({ open, onOpenChange, level, onSuccess }: Props) {
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => handleOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>
             Cancel
           </Button>
-          <Button onClick={handleSave}>Save KPI</Button>
+          <Button onClick={handleSave} disabled={saving}>
+            {saving && <Loader2 className="h-4 w-4 animate-spin" />}
+            Save KPI
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

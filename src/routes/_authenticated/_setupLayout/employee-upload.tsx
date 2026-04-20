@@ -107,13 +107,15 @@ const FIELD_ORDER: Record<string, number> = HEADERS.reduce(
 );
 
 function EmployeeUploadPage() {
-  const { roles } = useAuth();
+  const { roles, person } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
   const allowed = roles.includes("hr_rep") || roles.includes("ceo");
+  const commitFn = useServerFn(commitEmployeeUpload);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isValidating, setIsValidating] = useState(false);
+  const [isCommitting, setIsCommitting] = useState(false);
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
 

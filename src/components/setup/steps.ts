@@ -28,6 +28,7 @@ export const STEPS: SetupStep[] = [
     key: "assign_roles",
     title: "Assign Roles",
     description: "Give each person their CEO, manager, HR or employee role.",
+    route: "/role-assignment",
   },
   {
     key: "set_driver_weightings",

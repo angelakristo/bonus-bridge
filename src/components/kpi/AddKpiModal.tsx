@@ -188,15 +188,6 @@ export function AddKpiModal({ open, onOpenChange, level, onSuccess }: Props) {
             </RadioGroup>
           </div>
 
-          {/* Target fields placeholder — varies by KPI type */}
-          <div className="rounded-md border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
-            {values.kpi_type === "progressive" &&
-              "Target fields for Progressive KPIs (e.g. numeric target per period) will appear here."}
-            {values.kpi_type === "binary" &&
-              "Target field for Binary KPIs (achieved / not achieved) will appear here."}
-            {values.kpi_type === "benchmark" &&
-              "Target field for Benchmark KPIs (point-in-time score) will appear here."}
-          </div>
 
           {/* 4. Driver */}
           <div className="space-y-1.5">

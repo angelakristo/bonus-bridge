@@ -222,6 +222,78 @@ export function AddKpiModal({ open, onOpenChange, level, onSuccess }: Props) {
               placeholder="e.g. EUR, %, Score out of 5, Count"
             />
           </div>
+
+          {/* 6. Targets — dynamic based on KPI Type */}
+          <div className="space-y-3 rounded-md border bg-muted/20 p-3">
+            <div className="space-y-0.5">
+              <Label className="text-sm">Targets</Label>
+              <p className="text-xs text-muted-foreground">
+                Optional at draft stage — required before this KPI can be approved.
+              </p>
+            </div>
+
+            {(values.kpi_type === "progressive" || values.kpi_type === "benchmark") && (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                {NUMERIC_TARGET_FIELDS.map((f) => (
+                  <div key={f.key} className="space-y-1.5">
+                    <Label htmlFor={`target-${f.key}`} className="text-xs">
+                      {f.label}
+                    </Label>
+                    <Input
+                      id={`target-${f.key}`}
+                      type="number"
+                      inputMode="decimal"
+                      value={values.numeric_targets[f.key]}
+                      onChange={(e) =>
+                        setValues((v) => ({
+                          ...v,
+                          numeric_targets: {
+                            ...v.numeric_targets,
+                            [f.key]: e.target.value,
+                          },
+                        }))
+                      }
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {values.kpi_type === "binary" && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between rounded-md border bg-background p-3">
+                  <Label htmlFor="binary-midyear" className="text-sm font-normal">
+                    Achieved by Mid-Year?
+                  </Label>
+                  <Switch
+                    id="binary-midyear"
+                    checked={values.binary_targets.midyear}
+                    onCheckedChange={(checked) =>
+                      setValues((v) => ({
+                        ...v,
+                        binary_targets: { ...v.binary_targets, midyear: checked },
+                      }))
+                    }
+                  />
+                </div>
+                <div className="flex items-center justify-between rounded-md border bg-background p-3">
+                  <Label htmlFor="binary-yearend" className="text-sm font-normal">
+                    Achieved by Year-End?
+                  </Label>
+                  <Switch
+                    id="binary-yearend"
+                    checked={values.binary_targets.yearend}
+                    onCheckedChange={(checked) =>
+                      setValues((v) => ({
+                        ...v,
+                        binary_targets: { ...v.binary_targets, yearend: checked },
+                      }))
+                    }
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <DialogFooter>

@@ -26,12 +26,17 @@ export type KpiLevel = "corporate" | "department" | "individual";
 export type KpiType = "progressive" | "binary" | "benchmark";
 export type KpiDriver = "growth" | "efficiency" | "culture";
 
+export type NumericTargetPeriod = "q1" | "q2" | "q3" | "q4" | "midyear" | "yearend";
+export type BinaryTargetPeriod = "midyear" | "yearend";
+
 export type AddKpiFormValues = {
   title: string;
   description: string;
   kpi_type: KpiType;
   driver: KpiDriver;
   unit: string;
+  numeric_targets: Record<NumericTargetPeriod, string>;
+  binary_targets: Record<BinaryTargetPeriod, boolean>;
 };
 
 type Props = {
@@ -47,12 +52,23 @@ const LEVEL_LABEL: Record<KpiLevel, string> = {
   individual: "Individual",
 };
 
+const NUMERIC_TARGET_FIELDS: { key: NumericTargetPeriod; label: string }[] = [
+  { key: "q1", label: "Q1 Target" },
+  { key: "q2", label: "Q2 Target" },
+  { key: "q3", label: "Q3 Target" },
+  { key: "q4", label: "Q4 Target" },
+  { key: "midyear", label: "Mid-Year Target" },
+  { key: "yearend", label: "Year-End Target" },
+];
+
 const EMPTY: AddKpiFormValues = {
   title: "",
   description: "",
   kpi_type: "progressive",
   driver: "growth",
   unit: "",
+  numeric_targets: { q1: "", q2: "", q3: "", q4: "", midyear: "", yearend: "" },
+  binary_targets: { midyear: false, yearend: false },
 };
 
 export function AddKpiModal({ open, onOpenChange, level, onSuccess }: Props) {

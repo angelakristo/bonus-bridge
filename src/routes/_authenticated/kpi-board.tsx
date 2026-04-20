@@ -670,15 +670,28 @@ function KpiBoardPage() {
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                     Department KPIs ({deptKpis.length}/10)
                   </CardTitle>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!selectedDept}
-                    onClick={() => openModal("department")}
-                  >
-                    <Plus className="h-4 w-4" />
-                    Add KPI
-                  </Button>
+                  <TooltipProvider delayDuration={200}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span tabIndex={deptAtLimit ? 0 : -1}>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={!selectedDept || deptAtLimit}
+                            onClick={() => openModal("department")}
+                          >
+                            <Plus className="h-4 w-4" />
+                            Add KPI
+                          </Button>
+                        </span>
+                      </TooltipTrigger>
+                      {deptAtLimit && (
+                        <TooltipContent>
+                          Department KPI limit reached. Maximum 10 KPIs per board.
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  </TooltipProvider>
                 </div>
                 {orgDepts.length > 0 && (
                   <Select value={selectedDept} onValueChange={setSelectedDept}>

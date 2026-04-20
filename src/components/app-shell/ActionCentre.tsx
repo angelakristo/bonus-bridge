@@ -136,6 +136,15 @@ export function ActionCentre() {
     if (isEmployeeRole) void loadEmployee();
   }, [isManagerRole, isEmployeeRole, loadManager, loadEmployee]);
 
+  useEffect(() => {
+    const handler = () => {
+      if (isManagerRole) void loadManager();
+      if (isEmployeeRole) void loadEmployee();
+    };
+    window.addEventListener("action-centre:refresh", handler);
+    return () => window.removeEventListener("action-centre:refresh", handler);
+  }, [isManagerRole, isEmployeeRole, loadManager, loadEmployee]);
+
   const items = isManagerRole ? managerItems : employeeItems;
   const count = items.length;
 

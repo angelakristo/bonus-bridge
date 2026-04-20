@@ -1,86 +1,80 @@
 
 ## Goal
-Refactor the setup flow so every setup screen (`/register-entity`, `/org-departments`, `/employee-upload`, plus future ones) renders inside the standard AppShell with a persistent **Setup Checklist sidebar on the left side of the page content**. Completed steps show a green tick instead of an enumerated number. The TopNav (logout, etc.) and main app sidebar stay visible at all times.
+Replace the existing inline validation Dialog in `employee-upload.tsx` with a dedicated **Upload Validation Modal** component that matches the spec exactly: title "Upload Errors Found", error-count subtitle, three-column error table, and two footer buttons — **Close** and **Download Error Report** (xlsx export via SheetJS).
 
 ## Files touched
 
-### 1. New: `src/components/setup/steps.ts`
-Extract the `STEPS` array from `setup.tsx` into a shared source of truth, adding a `route?: string` field per step:
+### 1. New: `src/components/employee-upload/UploadValidationModal.tsx`
+Self-contained modal component built on shadcn `Dialog` + `Table`.
+
+Props:
 ```ts
-export type SetupStep = { key: string; title: string; description: string; route?: string };
-export const STEPS: SetupStep[] = [
-  { key: "register_entity", title: "Register Entity", route: "/register-entity", ... },
-  { key: "build_org_departments", title: "Build Org Departments", route: "/org-departments", ... },
-  { key: "upload_employees", title: "Upload Employees", route: "/employee-upload", ... },
-  { key: "assign_roles", title: "Assign Roles", ... },     // no route yet
-  ...
-];
+type ValidationError = { row: number; field: string; error: string };
+type Props = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  errors: ValidationError[];
+};
 ```
 
-### 2. New: `src/components/setup/SetupChecklist.tsx`
-Vertical checklist rendered as the LHS column inside the setup layout:
-- Green `CheckCircle2` icon when complete; otherwise the enumerated number in a circle.
-- Active step (matching current pathname) gets `bg-accent/40` highlight + bold.
-- Each row is a `<Link>` to its `route`. Completed steps remain clickable (so the user can revisit `/register-entity` even when already registered, per spec).
-- Steps without a route render disabled with a "Coming soon" hint.
-- Props: `progress: Record<string, SetupStepStatus>`, `loading: boolean`.
+Layout:
+- `DialogTitle`: **"Upload Errors Found"**
+- `DialogDescription` (subtitle): `Found {errors.length} {errors.length === 1 ? "error" : "errors"} in your file.` (uses total count, per spec — not the row count).
+- Body: scrollable container (`max-h-96 overflow-auto rounded-md border`) wrapping shadcn `Table` with three columns:
+  - **Row** (`w-20`)
+  - **Field** (`w-48`, `font-mono text-xs`)
+  - **Error Message**
+- Footer (`DialogFooter`): two buttons side by side:
+  - `variant="outline"` **Close** → calls `onOpenChange(false)`.
+  - `variant="default"` **Download Error Report** → calls `downloadErrorReport(errors)`. Disabled when `errors.length === 0` (defensive; modal shouldn't open in that case).
 
-### 3. New: `src/routes/_authenticated/_setup.tsx` (pathless layout route)
-Wraps any child route under it with a 2-column grid:
-- LHS (`w-72 shrink-0`): `<SetupChecklist progress={...} />`
-- RHS (`flex-1`): `<Outlet />`
+Download helper (inline in same file):
+```ts
+function downloadErrorReport(errors: ValidationError[]) {
+  const aoa = [
+    ["Row", "Field", "Error Message"],
+    ...errors.map((e) => [e.row, e.field, e.error]),
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  // bold header row + sensible column widths
+  ws["!cols"] = [{ wch: 8 }, { wch: 28 }, { wch: 60 }];
+  for (let c = 0; c < 3; c++) {
+    const addr = XLSX.utils.encode_cell({ r: 0, c });
+    if (ws[addr]) ws[addr].s = { font: { bold: true } };
+  }
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Upload Errors");
+  XLSX.writeFile(wb, "upload_errors.xlsx");
+}
+```
+Uses the already-installed `xlsx-js-style` package (same import as the template generator).
 
-Logic:
-- `useAuth()`: only `hr_rep` / `ceo` allowed; otherwise render existing "Access denied" card and skip the checklist (no info leak).
-- `useEntity()` for `entity_id`. If null we still render the layout, but only `register_entity` is enabled in the checklist.
-- Single `Promise.all` batch (when `entity_id` exists):
-  - `setup_progress.select("step_key, status").eq("entity_id", entity_id)` — fallback for steps without a screen
-  - `organisational_departments.select("id", { head: true, count: "exact" }).eq("entity_id", entity_id)`
-  - `people.select("id", { head: true, count: "exact" }).eq("entity_id", entity_id)`
-- Derived auto-completion:
-  - `register_entity` → complete iff `entity_id` is non-null
-  - `build_org_departments` → complete iff org-dept count > 0
-  - `upload_employees` → complete iff people count > 0
-  - All other keys → fall back to `setup_progress.status` (or `not_started`)
-- Result: a pre-registered user landing on `/register-entity` immediately sees a green tick on step 1 without clicking Continue. Same for departments / employees.
+No "Confirm", "Proceed", "Continue", or "Insert" button anywhere — confirmed by spec.
 
-### 4. Move existing route files under the layout
-- `src/routes/_authenticated/register-entity.tsx` → `src/routes/_authenticated/_setup/register-entity.tsx`
-- `src/routes/_authenticated/org-departments.tsx` → `src/routes/_authenticated/_setup/org-departments.tsx`
-- `src/routes/_authenticated/employee-upload.tsx` → `src/routes/_authenticated/_setup/employee-upload.tsx`
-
-Update `createFileRoute` strings to `"/_authenticated/_setup/<x>"`. URL paths stay identical because `_setup` is pathless.
-
-### 5. Update `src/routes/_authenticated.tsx` guard
-- Delete the `onRegisterEntity` branch that returns `<Outlet />` bare (without AppShell).
-- Delete the `shouldHoldRegisterEntity` early return.
-- Keep the "hr_rep with no entity → /register-entity" redirect.
-- Always wrap `<Outlet />` in `<AppShell>`. ← **this is the core ask**.
-
-### 6. Update `register-entity.tsx`
-Strip the full-viewport centered hero treatment (`min-h-[calc(100vh-4rem)]`, gradient blobs, centered card, BonusBridge logo inside the card) since it now lives inside AppShell + setup checklist. Replace with a normal page layout consistent with `/org-departments` and `/employee-upload`:
-- `<div className="mx-auto max-w-2xl space-y-6">` wrapping the existing `<Card>` (form unchanged).
-
-### 7. Refactor `setup.tsx`
-- Import `STEPS` from `src/components/setup/steps.ts`.
-- "Go" button: if `step.route` exists → `navigate({ to: step.route })`; else → existing "Coming soon" toast (drops the `register_entity`-only special case).
-
-### 8. AppSidebar — no functional change
-The "Setup" entry still points to `/setup`. The new in-context checklist is *additive* — it shows on the LHS of setup screens; the global app sidebar stays where it is.
+### 2. Edit: `src/routes/_authenticated/_setupLayout/employee-upload.tsx`
+- Remove the inline `<Dialog>…</Dialog>` block at the bottom of the page (the current "Upload Validation Errors" dialog and its inline table).
+- Remove the now-unused imports: `Dialog`, `DialogContent`, `DialogDescription`, `DialogFooter`, `DialogHeader`, `DialogTitle`, `Table`, `TableBody`, `TableCell`, `TableHead`, `TableHeader`, `TableRow`.
+- Import and render the new modal:
+  ```tsx
+  import { UploadValidationModal } from "@/components/employee-upload/UploadValidationModal";
+  …
+  <UploadValidationModal open={modalOpen} onOpenChange={setModalOpen} errors={errors} />
+  ```
+- Keep all existing state (`errors`, `modalOpen`, `setModalOpen`) and the existing validation pipeline in `handleUpload` exactly as-is. Continue to call `setModalOpen(true)` only when `collected.length > 0`.
+- The existing error-sort logic (by row, then by canonical field order) is preserved so the modal renders rows in deterministic order.
 
 ## What I am NOT doing
-- No Supabase schema changes (workspace rule).
-- No automatic writes to `setup_progress` from the layout — derivation is read-only.
-- No changes to Step 2 validation logic in `employee-upload.tsx` (only its route path moves).
-- No changes to Auth/Entity contexts.
-- No new routes for `assign_roles` etc. — they stay greyed in the checklist until built.
-- No mobile drawer for the checklist; on small viewports it stacks above content.
+- No changes to the validation rules or `handleUpload` parse logic.
+- No new "Continue / Proceed / Insert" affordance — the modal is purely informational + export.
+- No changes to Step 1 (template download).
+- No DB writes, no schema changes.
+- No changes to setup layout, checklist, or routing.
+- Not touching `src/routeTree.gen.ts` (auto-generated).
 
 ## Verification checklist
-- `hr_rep` with no entity → routed to `/register-entity`. TopNav with logout visible. LHS checklist shows step 1 highlighted, no green ticks. Other steps disabled.
-- After registering → redirected to `/org-departments`. Step 1 shows a green tick. Steps 2+ now clickable.
-- Manually navigating back to `/register-entity` shows the prefilled "Continue" form AND step 1 has a green tick.
-- `hr_rep` pre-loaded with entity + ≥1 org dept + ≥1 employee → first three steps all green on landing.
-- Clicking `/employee-upload` in the LHS keeps the checklist visible; logout still works from TopNav.
-- Non-HR/non-CEO hitting `/register-entity` directly → "Access denied" card, no checklist shown.
-- Standalone `/setup` page still works; "Go" navigates to the relevant route.
+- Trigger a failing upload (e.g. blank required field, unknown department, bad role) → modal opens with title **"Upload Errors Found"** and subtitle **"Found N errors in your file."**.
+- Table shows one row per error with **Row / Field / Error Message** columns; long lists scroll inside the modal.
+- Click **Close** → modal dismisses, file remains selected so HR Rep can fix and re-upload.
+- Click **Download Error Report** → `upload_errors.xlsx` downloads; opening it shows a header row (Row / Field / Error Message) and one row per error matching the on-screen table exactly.
+- A successful upload (no errors) does NOT open the modal — existing toast path unchanged.
+- No "Confirm" or "Proceed" button appears anywhere in the modal.

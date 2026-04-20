@@ -9,22 +9,7 @@ import { useEntity } from "@/contexts/EntityContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { UploadValidationModal } from "@/components/employee-upload/UploadValidationModal";
 
 export const Route = createFileRoute("/_authenticated/_setupLayout/employee-upload")({
   component: EmployeeUploadPage,
@@ -314,7 +299,6 @@ function EmployeeUploadPage() {
     }
   };
 
-  const errorRowCount = new Set(errors.map((e) => e.row)).size;
   const entityReady = !!entity_id && !entityLoading;
 
   return (
@@ -389,43 +373,7 @@ function EmployeeUploadPage() {
         </CardContent>
       </Card>
 
-      <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Upload Validation Errors</DialogTitle>
-            <DialogDescription>
-              Found {errors.length} {errors.length === 1 ? "error" : "errors"} across{" "}
-              {errorRowCount} {errorRowCount === 1 ? "row" : "rows"}. Please fix the file and try
-              again.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="max-h-96 overflow-auto rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-20">Row</TableHead>
-                  <TableHead className="w-48">Field</TableHead>
-                  <TableHead>Error</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {errors.map((e, i) => (
-                  <TableRow key={`${e.row}-${e.field}-${i}`}>
-                    <TableCell>{e.row}</TableCell>
-                    <TableCell className="font-mono text-xs">{e.field}</TableCell>
-                    <TableCell>{e.error}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setModalOpen(false)}>
-              Close
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <UploadValidationModal open={modalOpen} onOpenChange={setModalOpen} errors={errors} />
     </div>
   );
 }

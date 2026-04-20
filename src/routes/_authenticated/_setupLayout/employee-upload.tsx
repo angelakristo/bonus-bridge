@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx-js-style";
 import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2 } from "lucide-react";
 import { toast } from "sonner";
@@ -7,6 +8,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
 import { supabase } from "@/integrations/supabase/client";
+import { commitEmployeeUpload } from "@/integrations/supabase/employee-upload.functions";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UploadValidationModal } from "@/components/employee-upload/UploadValidationModal";

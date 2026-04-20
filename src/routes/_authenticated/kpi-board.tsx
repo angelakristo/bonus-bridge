@@ -231,6 +231,14 @@ async function insertDepartmentKpi(
   orgDeptId: string,
   displayOrder: number,
 ) {
+  const { count: totalCount } = await supabase
+    .from("department_kpis")
+    .select("id", { count: "exact", head: true })
+    .eq("entity_id", entityId)
+    .eq("year", year)
+    .eq("org_department_id", orgDeptId);
+  if ((totalCount ?? 0) >= MAX_KPIS_PER_BOARD) throw new Error("LIMIT");
+
   const { count } = await supabase
     .from("department_kpis")
     .select("id", { count: "exact", head: true })

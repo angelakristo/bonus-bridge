@@ -309,32 +309,55 @@ function EmployeeUploadPage() {
           },
         });
 
+        if (!result || typeof result !== "object") {
+          console.error("[EmployeeUpload] unexpected server response", result);
+          toast.error("Server returned an unexpected response. Please try again.");
+          return;
+        }
+
+        const inviteFailures = Array.isArray(result.inviteFailures)
+          ? result.inviteFailures
+          : [];
+        const inserted = typeof result.inserted === "number" ? result.inserted : 0;
+
         if (result.partialError) {
           toast.error(
-            `${result.partialError} (${result.inserted} of ${payload.length} rows inserted before failure.)`,
+            `${result.partialError} (${inserted} of ${payload.length} rows inserted before failure.)`,
           );
         } else {
           toast.success(
-            `${result.inserted} employees uploaded successfully. Invite emails sent.`,
+            `${inserted} employees uploaded successfully. Invite emails sent.`,
           );
           setSelectedFile(null);
           if (fileInputRef.current) fileInputRef.current.value = "";
         }
 
-        if (result.inviteFailures.length > 0) {
-          const preview = result.inviteFailures
+        if (inviteFailures.length > 0) {
+          const preview = inviteFailures
             .slice(0, 3)
             .map((f) => f.email)
             .join(", ");
           const more =
-            result.inviteFailures.length > 3
-              ? ` and ${result.inviteFailures.length - 3} more`
+            inviteFailures.length > 3
+              ? ` and ${inviteFailures.length - 3} more`
               : "";
           toast.warning(`Invite email failed for: ${preview}${more}.`);
         }
       } catch (commitErr) {
-        console.error("[EmployeeUpload] commit error", commitErr);
-        toast.error("Failed to upload employees. Please try again.");
+        let detail = "";
+        if (commitErr instanceof Response) {
+          try {
+            detail = await commitErr.text();
+          } catch {
+            detail = `HTTP ${commitErr.status}`;
+          }
+        } else if (commitErr instanceof Error) {
+          detail = commitErr.message;
+        } else {
+          detail = String(commitErr);
+        }
+        console.error("[EmployeeUpload] commit error", detail, commitErr);
+        toast.error(`Failed to upload employees: ${detail || "unknown error"}`);
       } finally {
         setIsCommitting(false);
       }

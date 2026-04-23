@@ -7,6 +7,7 @@ import {
   Wallet,
   Settings,
   Upload,
+  Scale,
   type LucideIcon,
 } from "lucide-react";
 
@@ -37,6 +38,7 @@ const NAV_ITEMS: NavItem[] = [
   { title: "Department View", url: "/departments", icon: Users, roles: ["ceo", "manager"] },
   { title: "Employee View", url: "/employees", icon: UserCircle, roles: ["ceo", "manager"] },
   { title: "KPI Board", url: "/kpi-board", icon: Target, roles: ["ceo", "manager"] },
+  { title: "Weightings", url: "/weighting-assignment", icon: Scale, roles: ["ceo", "manager"] },
   { title: "My KPI Proposals", url: "/individual-kpis", icon: Target, roles: ["employee"] },
   { title: "Bonus Schemes", url: "/bonus-schemes", icon: Wallet, roles: ["ceo"] },
   { title: "Setup", url: "/setup", icon: Settings, roles: ["ceo", "hr_rep"] },

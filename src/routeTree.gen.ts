@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedWeightingAssignmentRouteImport } from './routes/_authenticated/weighting-assignment'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedKpiBoardRouteImport } from './routes/_authenticated/kpi-board'
 import { Route as AuthenticatedKpiApprovalsRouteImport } from './routes/_authenticated/kpi-approvals'
@@ -38,6 +39,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedWeightingAssignmentRoute =
+  AuthenticatedWeightingAssignmentRouteImport.update({
+    id: '/weighting-assignment',
+    path: '/weighting-assignment',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
   id: '/setup',
   path: '/setup',
@@ -109,6 +116,7 @@ export interface FileRoutesByFullPath {
   '/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
@@ -123,6 +131,7 @@ export interface FileRoutesByTo {
   '/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
@@ -140,6 +149,7 @@ export interface FileRoutesById {
   '/_authenticated/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/_authenticated/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
+  '/_authenticated/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/_authenticated/_setupLayout/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/_authenticated/_setupLayout/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
@@ -156,6 +166,7 @@ export interface FileRouteTypes {
     | '/kpi-approvals'
     | '/kpi-board'
     | '/setup'
+    | '/weighting-assignment'
     | '/driver-weightings'
     | '/employee-upload'
     | '/org-departments'
@@ -170,6 +181,7 @@ export interface FileRouteTypes {
     | '/kpi-approvals'
     | '/kpi-board'
     | '/setup'
+    | '/weighting-assignment'
     | '/driver-weightings'
     | '/employee-upload'
     | '/org-departments'
@@ -186,6 +198,7 @@ export interface FileRouteTypes {
     | '/_authenticated/kpi-approvals'
     | '/_authenticated/kpi-board'
     | '/_authenticated/setup'
+    | '/_authenticated/weighting-assignment'
     | '/_authenticated/_setupLayout/driver-weightings'
     | '/_authenticated/_setupLayout/employee-upload'
     | '/_authenticated/_setupLayout/org-departments'
@@ -221,6 +234,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/weighting-assignment': {
+      id: '/_authenticated/weighting-assignment'
+      path: '/weighting-assignment'
+      fullPath: '/weighting-assignment'
+      preLoaderRoute: typeof AuthenticatedWeightingAssignmentRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/setup': {
       id: '/_authenticated/setup'
@@ -336,6 +356,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedKpiApprovalsRoute: typeof AuthenticatedKpiApprovalsRoute
   AuthenticatedKpiBoardRoute: typeof AuthenticatedKpiBoardRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
+  AuthenticatedWeightingAssignmentRoute: typeof AuthenticatedWeightingAssignmentRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
@@ -345,6 +366,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedKpiApprovalsRoute: AuthenticatedKpiApprovalsRoute,
   AuthenticatedKpiBoardRoute: AuthenticatedKpiBoardRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
+  AuthenticatedWeightingAssignmentRoute: AuthenticatedWeightingAssignmentRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

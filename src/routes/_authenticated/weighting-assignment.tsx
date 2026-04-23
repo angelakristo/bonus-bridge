@@ -445,55 +445,65 @@ function WeightingAssignmentPage() {
     level: KpiLevel,
     items: ItemRow[],
     subtotal: number,
-  ) => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">
-            No KPIs assigned in this group.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((it) => {
-              const ds = DRIVER_STYLE[it.driver];
-              return (
-                <div
-                  key={it.kpi_assignment_id}
-                  className="flex items-center justify-between gap-3 rounded-md border p-3"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {it.title}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn("border-0", ds.bg, ds.text)}
-                    >
-                      {ds.label}
-                    </Badge>
+  ) => {
+    const showError = items.length > 0 && subtotal !== 100;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">
+              No KPIs assigned in this group.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {items.map((it) => {
+                const ds = DRIVER_STYLE[it.driver];
+                return (
+                  <div
+                    key={it.kpi_assignment_id}
+                    className="flex items-center justify-between gap-3 rounded-md border p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium">
+                        {it.title}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={cn("border-0", ds.bg, ds.text)}
+                      >
+                        {ds.label}
+                      </Badge>
+                    </div>
+                    <WeightInput
+                      ariaLabel={`Weight for ${it.title}`}
+                      value={getWeight(level, it.kpi_assignment_id)}
+                      onChange={(n) =>
+                        setWeight(level, it.kpi_assignment_id, n)
+                      }
+                    />
                   </div>
-                  <WeightInput
-                    ariaLabel={`Weight for ${it.title}`}
-                    value={getWeight(level, it.kpi_assignment_id)}
-                    onChange={(n) => setWeight(level, it.kpi_assignment_id, n)}
-                  />
-                </div>
-              );
-            })}
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                Subtotal
-              </span>
-              <SubtotalLabel sum={subtotal} />
+                );
+              })}
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Subtotal
+                </span>
+                <SubtotalLabel sum={subtotal} />
+              </div>
+              {showError && (
+                <p className="pt-1 text-sm text-destructive">
+                  {title} weights must sum to 100%. Current total: {subtotal}%.
+                </p>
+              )}
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-4">

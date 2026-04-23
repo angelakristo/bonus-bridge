@@ -281,14 +281,13 @@ function WeightingAssignmentPage() {
 
     let deptRows: ItemRow[] = [];
     if (orgDeptIds.length > 0 || funcDeptIds.length > 0) {
-      let dq = supabase
+      const { data: dData, error: dErr } = await supabase
         .from("department_kpis")
         .select(
           "id, org_department_id, functional_department_id, kpi_definitions(title, driver)",
         )
         .eq("entity_id", entity_id)
         .eq("year", selected_year);
-      const { data: dData, error: dErr } = await dq;
       if (dErr) {
         console.error("[Weighting] department_kpis failed", dErr);
       } else {

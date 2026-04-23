@@ -347,26 +347,20 @@ function WeightingAssignmentPage() {
     [indItems, itemWeights],
   );
 
+  const groupValid = groupTotal === 100;
+  const corpValid = corpItems.length === 0 || corpSubtotal === 100;
+  const deptValid = deptItems.length === 0 || deptSubtotal === 100;
+  const indValid = indItems.length === 0 || indSubtotal === 100;
+  const allValid = groupValid && corpValid && deptValid && indValid;
+
+  const selectedEmployeeName =
+    employees.find((e) => e.id === selectedPersonId)?.full_name ?? "employee";
+
   const handleSave = async () => {
-    if (!entity_id || !selectedPersonId) return;
-
-    const errors: string[] = [];
-    if (groupTotal !== 100) errors.push("Group Weights must total 100%");
-    if (corpItems.length > 0 && corpSubtotal !== 100)
-      errors.push("Corporate KPI weights must total 100%");
-    if (deptItems.length > 0 && deptSubtotal !== 100)
-      errors.push("Department KPI weights must total 100%");
-    if (indItems.length > 0 && indSubtotal !== 100)
-      errors.push("Individual KPI weights must total 100%");
-
-    if (errors.length > 0) {
-      toast.error(errors.join(" • "));
-      return;
-    }
+    if (!entity_id || !selectedPersonId || !allValid) return;
 
     setSaving(true);
 
-    // Upsert group weights
     const { error: groupErr } = await supabase
       .from("employee_kpi_group_weights")
       .upsert(
@@ -384,21 +378,6 @@ function WeightingAssignmentPage() {
     if (groupErr) {
       console.error("[Weighting] upsert group failed", groupErr);
       toast.error("Failed to save group weights.");
-      setSaving(false);
-      return;
-    }
-
-    // Replace item weights: delete then insert
-    const { error: delErr } = await supabase
-      .from("employee_kpi_item_weights")
-      .delete()
-      .eq("entity_id", entity_id)
-      .eq("person_id", selectedPersonId)
-      .eq("year", selected_year);
-
-    if (delErr) {
-      console.error("[Weighting] delete item weights failed", delErr);
-      toast.error("Failed to update item weights.");
       setSaving(false);
       return;
     }
@@ -429,11 +408,13 @@ function WeightingAssignmentPage() {
     pushAll("individual", indItems);
 
     if (inserts.length > 0) {
-      const { error: insErr } = await supabase
+      const { error: upErr } = await supabase
         .from("employee_kpi_item_weights")
-        .insert(inserts);
-      if (insErr) {
-        console.error("[Weighting] insert item weights failed", insErr);
+        .upsert(inserts, {
+          onConflict: "person_id,entity_id,year,kpi_level,kpi_assignment_id",
+        });
+      if (upErr) {
+        console.error("[Weighting] upsert item weights failed", upErr);
         toast.error("Failed to save item weights.");
         setSaving(false);
         return;
@@ -441,7 +422,7 @@ function WeightingAssignmentPage() {
     }
 
     setSaving(false);
-    toast.success("Weightings saved.");
+    toast.success(`Weightings saved for ${selectedEmployeeName}.`);
   };
 
   if (!allowed) {

@@ -607,6 +607,12 @@ function WeightingAssignmentPage() {
                     </span>
                     <SubtotalLabel sum={groupTotal} />
                   </div>
+                  {!groupValid && (
+                    <p className="mt-2 text-sm text-destructive">
+                      Group weights must sum to 100%. Current total:{" "}
+                      {groupTotal}%.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 

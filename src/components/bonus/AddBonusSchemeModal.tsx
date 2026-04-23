@@ -49,7 +49,6 @@ export function AddBonusSchemeModal({
     setSaving(true);
     setError(null);
 
-    // Uniqueness check within entity
     const { data: existing, error: checkErr } = await supabase
       .from("bonus_schemes")
       .select("id")

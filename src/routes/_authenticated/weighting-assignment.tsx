@@ -211,14 +211,15 @@ function WeightingAssignmentPage() {
       .select("functional_department_id")
       .eq("person_id", selectedPersonId);
 
-    // 4. Individual items
+    // 4. Individual items - approved only
     const indReq = supabase
       .from("individual_kpis")
       .select("id, kpi_definitions(title, driver)")
       .eq("entity_id", entity_id)
       .eq("person_id", selectedPersonId)
       .eq("year", selected_year)
-      .eq("is_active", true);
+      .eq("is_active", true)
+      .eq("status", "approved");
 
     // 5. Existing item weights
     const itemWeightsReq = supabase

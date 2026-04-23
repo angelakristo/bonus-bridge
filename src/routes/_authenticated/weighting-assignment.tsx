@@ -347,26 +347,20 @@ function WeightingAssignmentPage() {
     [indItems, itemWeights],
   );
 
+  const groupValid = groupTotal === 100;
+  const corpValid = corpItems.length === 0 || corpSubtotal === 100;
+  const deptValid = deptItems.length === 0 || deptSubtotal === 100;
+  const indValid = indItems.length === 0 || indSubtotal === 100;
+  const allValid = groupValid && corpValid && deptValid && indValid;
+
+  const selectedEmployeeName =
+    employees.find((e) => e.id === selectedPersonId)?.full_name ?? "employee";
+
   const handleSave = async () => {
-    if (!entity_id || !selectedPersonId) return;
-
-    const errors: string[] = [];
-    if (groupTotal !== 100) errors.push("Group Weights must total 100%");
-    if (corpItems.length > 0 && corpSubtotal !== 100)
-      errors.push("Corporate KPI weights must total 100%");
-    if (deptItems.length > 0 && deptSubtotal !== 100)
-      errors.push("Department KPI weights must total 100%");
-    if (indItems.length > 0 && indSubtotal !== 100)
-      errors.push("Individual KPI weights must total 100%");
-
-    if (errors.length > 0) {
-      toast.error(errors.join(" • "));
-      return;
-    }
+    if (!entity_id || !selectedPersonId || !allValid) return;
 
     setSaving(true);
 
-    // Upsert group weights
     const { error: groupErr } = await supabase
       .from("employee_kpi_group_weights")
       .upsert(
@@ -384,21 +378,6 @@ function WeightingAssignmentPage() {
     if (groupErr) {
       console.error("[Weighting] upsert group failed", groupErr);
       toast.error("Failed to save group weights.");
-      setSaving(false);
-      return;
-    }
-
-    // Replace item weights: delete then insert
-    const { error: delErr } = await supabase
-      .from("employee_kpi_item_weights")
-      .delete()
-      .eq("entity_id", entity_id)
-      .eq("person_id", selectedPersonId)
-      .eq("year", selected_year);
-
-    if (delErr) {
-      console.error("[Weighting] delete item weights failed", delErr);
-      toast.error("Failed to update item weights.");
       setSaving(false);
       return;
     }
@@ -429,11 +408,13 @@ function WeightingAssignmentPage() {
     pushAll("individual", indItems);
 
     if (inserts.length > 0) {
-      const { error: insErr } = await supabase
+      const { error: upErr } = await supabase
         .from("employee_kpi_item_weights")
-        .insert(inserts);
-      if (insErr) {
-        console.error("[Weighting] insert item weights failed", insErr);
+        .upsert(inserts, {
+          onConflict: "person_id,entity_id,year,kpi_level,kpi_assignment_id",
+        });
+      if (upErr) {
+        console.error("[Weighting] upsert item weights failed", upErr);
         toast.error("Failed to save item weights.");
         setSaving(false);
         return;
@@ -441,7 +422,7 @@ function WeightingAssignmentPage() {
     }
 
     setSaving(false);
-    toast.success("Weightings saved.");
+    toast.success(`Weightings saved for ${selectedEmployeeName}.`);
   };
 
   if (!allowed) {
@@ -464,55 +445,65 @@ function WeightingAssignmentPage() {
     level: KpiLevel,
     items: ItemRow[],
     subtotal: number,
-  ) => (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="py-4 text-sm text-muted-foreground">
-            No KPIs assigned in this group.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {items.map((it) => {
-              const ds = DRIVER_STYLE[it.driver];
-              return (
-                <div
-                  key={it.kpi_assignment_id}
-                  className="flex items-center justify-between gap-3 rounded-md border p-3"
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm font-medium">
-                      {it.title}
-                    </span>
-                    <Badge
-                      variant="outline"
-                      className={cn("border-0", ds.bg, ds.text)}
-                    >
-                      {ds.label}
-                    </Badge>
+  ) => {
+    const showError = items.length > 0 && subtotal !== 100;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{title}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="py-4 text-sm text-muted-foreground">
+              No KPIs assigned in this group.
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {items.map((it) => {
+                const ds = DRIVER_STYLE[it.driver];
+                return (
+                  <div
+                    key={it.kpi_assignment_id}
+                    className="flex items-center justify-between gap-3 rounded-md border p-3"
+                  >
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="truncate text-sm font-medium">
+                        {it.title}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={cn("border-0", ds.bg, ds.text)}
+                      >
+                        {ds.label}
+                      </Badge>
+                    </div>
+                    <WeightInput
+                      ariaLabel={`Weight for ${it.title}`}
+                      value={getWeight(level, it.kpi_assignment_id)}
+                      onChange={(n) =>
+                        setWeight(level, it.kpi_assignment_id, n)
+                      }
+                    />
                   </div>
-                  <WeightInput
-                    ariaLabel={`Weight for ${it.title}`}
-                    value={getWeight(level, it.kpi_assignment_id)}
-                    onChange={(n) => setWeight(level, it.kpi_assignment_id, n)}
-                  />
-                </div>
-              );
-            })}
-            <div className="flex items-center justify-between pt-2">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">
-                Subtotal
-              </span>
-              <SubtotalLabel sum={subtotal} />
+                );
+              })}
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-xs uppercase tracking-wide text-muted-foreground">
+                  Subtotal
+                </span>
+                <SubtotalLabel sum={subtotal} />
+              </div>
+              {showError && (
+                <p className="pt-1 text-sm text-destructive">
+                  {title} weights must sum to 100%. Current total: {subtotal}%.
+                </p>
+              )}
             </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -616,6 +607,12 @@ function WeightingAssignmentPage() {
                     </span>
                     <SubtotalLabel sum={groupTotal} />
                   </div>
+                  {!groupValid && (
+                    <p className="mt-2 text-sm text-destructive">
+                      Group weights must sum to 100%. Current total:{" "}
+                      {groupTotal}%.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
 
@@ -646,7 +643,7 @@ function WeightingAssignmentPage() {
               </div>
 
               <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving}>
+                <Button onClick={handleSave} disabled={saving || !allValid}>
                   {saving ? (
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : (

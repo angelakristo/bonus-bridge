@@ -41,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { title: "Weightings", url: "/weighting-assignment", icon: Scale, roles: ["ceo", "manager"] },
   { title: "My KPI Proposals", url: "/individual-kpis", icon: Target, roles: ["employee"] },
   { title: "Bonus Schemes", url: "/bonus-schemes", icon: Wallet, roles: ["ceo"] },
+  { title: "Bonus Assignments", url: "/bonus-assignments", icon: Wallet, roles: ["ceo", "manager"] },
   { title: "Setup", url: "/setup", icon: Settings, roles: ["ceo", "hr_rep"] },
   { title: "Upload Data", url: "/employee-upload", icon: Upload, roles: ["ceo", "hr_rep"] },
 ];

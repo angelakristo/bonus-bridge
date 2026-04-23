@@ -19,6 +19,7 @@ import { Route as AuthenticatedKpiApprovalsRouteImport } from './routes/_authent
 import { Route as AuthenticatedIndividualKpisRouteImport } from './routes/_authenticated/individual-kpis'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBonusSchemesRouteImport } from './routes/_authenticated/bonus-schemes'
+import { Route as AuthenticatedBonusAssignmentsRouteImport } from './routes/_authenticated/bonus-assignments'
 import { Route as AuthenticatedSetupLayoutRouteImport } from './routes/_authenticated/_setupLayout'
 import { Route as AuthenticatedSetupLayoutRoleAssignmentRouteImport } from './routes/_authenticated/_setupLayout/role-assignment'
 import { Route as AuthenticatedSetupLayoutRegisterEntityRouteImport } from './routes/_authenticated/_setupLayout/register-entity'
@@ -79,6 +80,12 @@ const AuthenticatedBonusSchemesRoute =
     path: '/bonus-schemes',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedBonusAssignmentsRoute =
+  AuthenticatedBonusAssignmentsRouteImport.update({
+    id: '/bonus-assignments',
+    path: '/bonus-assignments',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSetupLayoutRoute =
   AuthenticatedSetupLayoutRouteImport.update({
     id: '/_setupLayout',
@@ -118,6 +125,7 @@ const AuthenticatedSetupLayoutDriverWeightingsRoute =
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
   '/bonus-schemes': typeof AuthenticatedBonusSchemesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/individual-kpis': typeof AuthenticatedIndividualKpisRoute
@@ -134,6 +142,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
+  '/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
   '/bonus-schemes': typeof AuthenticatedBonusSchemesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/individual-kpis': typeof AuthenticatedIndividualKpisRoute
@@ -153,6 +162,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteWithChildren
   '/login': typeof LoginRoute
   '/_authenticated/_setupLayout': typeof AuthenticatedSetupLayoutRouteWithChildren
+  '/_authenticated/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
   '/_authenticated/bonus-schemes': typeof AuthenticatedBonusSchemesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/individual-kpis': typeof AuthenticatedIndividualKpisRoute
@@ -171,6 +181,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/bonus-assignments'
     | '/bonus-schemes'
     | '/dashboard'
     | '/individual-kpis'
@@ -187,6 +198,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/login'
+    | '/bonus-assignments'
     | '/bonus-schemes'
     | '/dashboard'
     | '/individual-kpis'
@@ -205,6 +217,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/login'
     | '/_authenticated/_setupLayout'
+    | '/_authenticated/bonus-assignments'
     | '/_authenticated/bonus-schemes'
     | '/_authenticated/dashboard'
     | '/_authenticated/individual-kpis'
@@ -297,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedBonusSchemesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/bonus-assignments': {
+      id: '/_authenticated/bonus-assignments'
+      path: '/bonus-assignments'
+      fullPath: '/bonus-assignments'
+      preLoaderRoute: typeof AuthenticatedBonusAssignmentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/_setupLayout': {
       id: '/_authenticated/_setupLayout'
       path: ''
@@ -371,6 +391,7 @@ const AuthenticatedSetupLayoutRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedSetupLayoutRoute: typeof AuthenticatedSetupLayoutRouteWithChildren
+  AuthenticatedBonusAssignmentsRoute: typeof AuthenticatedBonusAssignmentsRoute
   AuthenticatedBonusSchemesRoute: typeof AuthenticatedBonusSchemesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedIndividualKpisRoute: typeof AuthenticatedIndividualKpisRoute
@@ -382,6 +403,7 @@ interface AuthenticatedRouteChildren {
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSetupLayoutRoute: AuthenticatedSetupLayoutRouteWithChildren,
+  AuthenticatedBonusAssignmentsRoute: AuthenticatedBonusAssignmentsRoute,
   AuthenticatedBonusSchemesRoute: AuthenticatedBonusSchemesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedIndividualKpisRoute: AuthenticatedIndividualKpisRoute,

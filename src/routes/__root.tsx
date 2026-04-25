@@ -33,14 +33,14 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "KPI App" },
-      { name: "description", content: "KPI tracking and management" },
-      { name: "author", content: "Lovable" },
-      { property: "og:title", content: "KPI App" },
-      { property: "og:description", content: "KPI tracking and management" },
+      { title: "BonusBridge" },
+      { name: "description", content: "KPI management and bonus tracking" },
+      { name: "author", content: "BonusBridge" },
+      { property: "og:title", content: "BonusBridge" },
+      { property: "og:description", content: "KPI management and bonus tracking" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
-      { name: "twitter:site", content: "@Lovable" },
+      { name: "twitter:site", content: "@BonusBridge" },
     ],
     links: [
       {

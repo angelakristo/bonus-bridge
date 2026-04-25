@@ -73,7 +73,7 @@ function DroppableColumn({
   return (
     <div
       ref={setNodeRef}
-      className={isOver ? "ring-2 ring-primary/40 rounded-lg transition-shadow" : "transition-shadow"}
+      className={isOver ? "ring-2 ring-primary/40 rounded-lg transition-shadow h-full" : "transition-shadow h-full"}
     >
       {children}
     </div>
@@ -556,25 +556,25 @@ function KpiBoardPage() {
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex flex-col gap-4 p-4 md:p-6">
+      <div className="h-full flex flex-col gap-3">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold tracking-tight">KPI Board</h1>
+        <div className="flex items-center justify-between shrink-0">
+          <h1 className="text-xl font-bold tracking-tight">KPI Board</h1>
           <span className="rounded-md bg-muted px-3 py-1 text-sm font-medium">{selected_year}</span>
         </div>
 
         {/* Three-column grid */}
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <div className="flex-1 min-h-0 grid grid-cols-1 gap-3 lg:grid-cols-3">
           {/* ---- 1. KPI Library ---- */}
-          <Card className="flex flex-col">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
+          <Card className="flex flex-col min-h-64 lg:min-h-0">
+            <CardHeader className="pb-2 shrink-0">
+              <CardTitle className="flex items-center gap-2 text-sm">
                 <Library className="h-4 w-4 text-muted-foreground" />
                 KPI Library ({library.length})
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 p-0">
-              <ScrollArea className="h-[calc(100vh-260px)] px-4 pb-4">
+            <CardContent className="flex-1 min-h-0 p-0">
+              <ScrollArea className="h-full px-4 pb-4">
                 {libLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -601,10 +601,10 @@ function KpiBoardPage() {
 
           {/* ---- 2. Corporate KPIs ---- */}
           <DroppableColumn id="corporate-column">
-            <Card className="flex flex-col">
-              <CardHeader className="pb-3">
+            <Card className="flex flex-col min-h-64 lg:min-h-0">
+              <CardHeader className="pb-2 shrink-0">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
+                  <CardTitle className="flex items-center gap-2 text-sm">
                     <Building2 className="h-4 w-4 text-muted-foreground" />
                     Corporate KPIs ({corpKpis.length}/10)
                   </CardTitle>
@@ -632,8 +632,8 @@ function KpiBoardPage() {
                   </TooltipProvider>
                 </div>
               </CardHeader>
-              <CardContent className="flex-1 p-0">
-                <ScrollArea className="h-[calc(100vh-260px)] px-4 pb-4">
+              <CardContent className="flex-1 min-h-0 p-0">
+                <ScrollArea className="h-full px-4 pb-4">
                   {corpLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
@@ -663,10 +663,10 @@ function KpiBoardPage() {
 
           {/* ---- 3. Department KPIs ---- */}
           <DroppableColumn id="department-column">
-            <Card className="flex flex-col">
-              <CardHeader className="pb-3 space-y-3">
+            <Card className="flex flex-col min-h-64 lg:min-h-0">
+              <CardHeader className="pb-2 space-y-2 shrink-0">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
+                  <CardTitle className="flex items-center gap-2 text-sm">
                     <Briefcase className="h-4 w-4 text-muted-foreground" />
                     Department KPIs ({deptKpis.length}/10)
                   </CardTitle>
@@ -708,8 +708,8 @@ function KpiBoardPage() {
                   </Select>
                 )}
               </CardHeader>
-              <CardContent className="flex-1 p-0">
-                <ScrollArea className="h-[calc(100vh-320px)] px-4 pb-4">
+              <CardContent className="flex-1 min-h-0 p-0">
+                <ScrollArea className="h-full px-4 pb-4">
                   {deptLoading ? (
                     <div className="flex items-center justify-center py-12">
                       <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

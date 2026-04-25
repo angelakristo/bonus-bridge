@@ -157,9 +157,9 @@ function DriverWeightingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-6">
+    <div className="mx-auto max-w-5xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Driver Weightings</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Driver Weightings</h1>
         <p className="text-sm text-muted-foreground">
           Year:{" "}
           <span className="font-medium text-foreground">{selected_year}</span>

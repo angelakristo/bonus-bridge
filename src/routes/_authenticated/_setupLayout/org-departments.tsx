@@ -94,19 +94,17 @@ function OrgDepartmentBuilderPage() {
 
   if (!allowed) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-muted-foreground">
-          You do not have permission to view this page.
-        </p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        You do not have permission to view this page.
+      </p>
     );
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Org Department Builder</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Org Department Builder</h1>
           <p className="text-sm text-muted-foreground">
             Organise your company's reporting structure.
           </p>

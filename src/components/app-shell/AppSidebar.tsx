@@ -1,13 +1,13 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import {
   Home,
-  Users,
-  UserCircle,
   Target,
   Wallet,
   Settings,
   Upload,
   Scale,
+  CheckSquare,
+  History,
   type LucideIcon,
 } from "lucide-react";
 
@@ -34,16 +34,17 @@ type NavItem = {
 };
 
 const NAV_ITEMS: NavItem[] = [
-  { title: "My Dashboard", url: "/dashboard", icon: Home, roles: ["ceo", "manager", "hr_rep", "employee"] },
-  { title: "Department View", url: "/departments", icon: Users, roles: ["ceo", "manager"] },
-  { title: "Employee View", url: "/employees", icon: UserCircle, roles: ["ceo", "manager"] },
-  { title: "KPI Board", url: "/kpi-board", icon: Target, roles: ["ceo", "manager"] },
-  { title: "Weightings", url: "/weighting-assignment", icon: Scale, roles: ["ceo", "manager"] },
-  { title: "My KPI Proposals", url: "/individual-kpis", icon: Target, roles: ["employee"] },
-  { title: "Bonus Schemes", url: "/bonus-schemes", icon: Wallet, roles: ["ceo"] },
-  { title: "Bonus Assignments", url: "/bonus-assignments", icon: Wallet, roles: ["ceo", "manager"] },
-  { title: "Setup", url: "/setup", icon: Settings, roles: ["ceo", "hr_rep"] },
-  { title: "Upload Data", url: "/employee-upload", icon: Upload, roles: ["ceo", "hr_rep"] },
+  { title: "My Dashboard",      url: "/dashboard",           icon: Home,         roles: ["ceo", "manager", "hr_rep", "employee"] },
+  { title: "KPI Board",         url: "/kpi-board",           icon: Target,       roles: ["ceo", "manager"] },
+  { title: "KPI Approvals",     url: "/kpi-approvals",       icon: CheckSquare,  roles: ["ceo", "manager"] },
+  { title: "My KPI Proposals",  url: "/individual-kpis",     icon: Target,       roles: ["employee"] },
+  { title: "Weightings",        url: "/weighting-assignment",icon: Scale,        roles: ["ceo", "manager"] },
+  { title: "Bonus Schemes",     url: "/bonus-schemes",       icon: Wallet,       roles: ["ceo"] },
+  { title: "Bonus Assignments", url: "/bonus-assignments",   icon: Wallet,       roles: ["ceo", "manager"] },
+  { title: "Setup",             url: "/setup",               icon: Settings,     roles: ["ceo", "hr_rep"] },
+  { title: "Upload Employees",  url: "/employee-upload",     icon: Upload,       roles: ["ceo", "hr_rep"] },
+  { title: "Upload Actuals",    url: "/actuals-upload",      icon: Upload,       roles: ["ceo", "hr_rep"] },
+  { title: "Upload History",    url: "/upload-history",      icon: History,      roles: ["ceo", "hr_rep"] },
 ];
 
 function hasAnyRole(userRoles: UserRole[], allowed: UserRole[]) {

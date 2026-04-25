@@ -99,11 +99,11 @@ function SetupLayout() {
   }
 
   return (
-    <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+    <div className="flex flex-col gap-4 lg:flex-row">
       <SetupChecklist
         progress={progress}
         loading={loading}
-        className="w-full lg:w-72 lg:shrink-0"
+        className="w-full lg:w-64 lg:shrink-0"
       />
       <div className="min-w-0 flex-1">
         <Outlet />

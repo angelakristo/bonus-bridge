@@ -9,10 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SupportRouteImport } from './routes/support'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as LanguageRouteImport } from './routes/language'
+import { Route as FaqsRouteImport } from './routes/faqs'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedWeightingAssignmentRouteImport } from './routes/_authenticated/weighting-assignment'
+import { Route as AuthenticatedUploadHistoryRouteImport } from './routes/_authenticated/upload-history'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedKpiBoardRouteImport } from './routes/_authenticated/kpi-board'
 import { Route as AuthenticatedKpiApprovalsRouteImport } from './routes/_authenticated/kpi-approvals'
@@ -20,6 +25,7 @@ import { Route as AuthenticatedIndividualKpisRouteImport } from './routes/_authe
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedBonusSchemesRouteImport } from './routes/_authenticated/bonus-schemes'
 import { Route as AuthenticatedBonusAssignmentsRouteImport } from './routes/_authenticated/bonus-assignments'
+import { Route as AuthenticatedActualsUploadRouteImport } from './routes/_authenticated/actuals-upload'
 import { Route as AuthenticatedSetupLayoutRouteImport } from './routes/_authenticated/_setupLayout'
 import { Route as AuthenticatedSetupLayoutRoleAssignmentRouteImport } from './routes/_authenticated/_setupLayout/role-assignment'
 import { Route as AuthenticatedSetupLayoutRegisterEntityRouteImport } from './routes/_authenticated/_setupLayout/register-entity'
@@ -27,9 +33,29 @@ import { Route as AuthenticatedSetupLayoutOrgDepartmentsRouteImport } from './ro
 import { Route as AuthenticatedSetupLayoutEmployeeUploadRouteImport } from './routes/_authenticated/_setupLayout/employee-upload'
 import { Route as AuthenticatedSetupLayoutDriverWeightingsRouteImport } from './routes/_authenticated/_setupLayout/driver-weightings'
 
+const SupportRoute = SupportRouteImport.update({
+  id: '/support',
+  path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LanguageRoute = LanguageRouteImport.update({
+  id: '/language',
+  path: '/language',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqsRoute = FaqsRouteImport.update({
+  id: '/faqs',
+  path: '/faqs',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
@@ -45,6 +71,12 @@ const AuthenticatedWeightingAssignmentRoute =
   AuthenticatedWeightingAssignmentRouteImport.update({
     id: '/weighting-assignment',
     path: '/weighting-assignment',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedUploadHistoryRoute =
+  AuthenticatedUploadHistoryRouteImport.update({
+    id: '/upload-history',
+    path: '/upload-history',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
@@ -86,6 +118,12 @@ const AuthenticatedBonusAssignmentsRoute =
     path: '/bonus-assignments',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedActualsUploadRoute =
+  AuthenticatedActualsUploadRouteImport.update({
+    id: '/actuals-upload',
+    path: '/actuals-upload',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSetupLayoutRoute =
   AuthenticatedSetupLayoutRouteImport.update({
     id: '/_setupLayout',
@@ -124,7 +162,12 @@ const AuthenticatedSetupLayoutDriverWeightingsRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/faqs': typeof FaqsRoute
+  '/language': typeof LanguageRoute
   '/login': typeof LoginRoute
+  '/support': typeof SupportRoute
+  '/actuals-upload': typeof AuthenticatedActualsUploadRoute
   '/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
   '/bonus-schemes': typeof AuthenticatedBonusSchemesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -132,6 +175,7 @@ export interface FileRoutesByFullPath {
   '/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
@@ -141,7 +185,12 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/faqs': typeof FaqsRoute
+  '/language': typeof LanguageRoute
   '/login': typeof LoginRoute
+  '/support': typeof SupportRoute
+  '/actuals-upload': typeof AuthenticatedActualsUploadRoute
   '/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
   '/bonus-schemes': typeof AuthenticatedBonusSchemesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -149,6 +198,7 @@ export interface FileRoutesByTo {
   '/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
+  '/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
@@ -160,8 +210,13 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteWithChildren
+  '/about': typeof AboutRoute
+  '/faqs': typeof FaqsRoute
+  '/language': typeof LanguageRoute
   '/login': typeof LoginRoute
+  '/support': typeof SupportRoute
   '/_authenticated/_setupLayout': typeof AuthenticatedSetupLayoutRouteWithChildren
+  '/_authenticated/actuals-upload': typeof AuthenticatedActualsUploadRoute
   '/_authenticated/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
   '/_authenticated/bonus-schemes': typeof AuthenticatedBonusSchemesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -169,6 +224,7 @@ export interface FileRoutesById {
   '/_authenticated/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/_authenticated/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
+  '/_authenticated/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/_authenticated/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/_authenticated/_setupLayout/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
@@ -180,7 +236,12 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
+    | '/faqs'
+    | '/language'
     | '/login'
+    | '/support'
+    | '/actuals-upload'
     | '/bonus-assignments'
     | '/bonus-schemes'
     | '/dashboard'
@@ -188,6 +249,7 @@ export interface FileRouteTypes {
     | '/kpi-approvals'
     | '/kpi-board'
     | '/setup'
+    | '/upload-history'
     | '/weighting-assignment'
     | '/driver-weightings'
     | '/employee-upload'
@@ -197,7 +259,12 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
+    | '/faqs'
+    | '/language'
     | '/login'
+    | '/support'
+    | '/actuals-upload'
     | '/bonus-assignments'
     | '/bonus-schemes'
     | '/dashboard'
@@ -205,6 +272,7 @@ export interface FileRouteTypes {
     | '/kpi-approvals'
     | '/kpi-board'
     | '/setup'
+    | '/upload-history'
     | '/weighting-assignment'
     | '/driver-weightings'
     | '/employee-upload'
@@ -215,8 +283,13 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/about'
+    | '/faqs'
+    | '/language'
     | '/login'
+    | '/support'
     | '/_authenticated/_setupLayout'
+    | '/_authenticated/actuals-upload'
     | '/_authenticated/bonus-assignments'
     | '/_authenticated/bonus-schemes'
     | '/_authenticated/dashboard'
@@ -224,6 +297,7 @@ export interface FileRouteTypes {
     | '/_authenticated/kpi-approvals'
     | '/_authenticated/kpi-board'
     | '/_authenticated/setup'
+    | '/_authenticated/upload-history'
     | '/_authenticated/weighting-assignment'
     | '/_authenticated/_setupLayout/driver-weightings'
     | '/_authenticated/_setupLayout/employee-upload'
@@ -235,16 +309,48 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRoute: typeof AuthenticatedRouteWithChildren
+  AboutRoute: typeof AboutRoute
+  FaqsRoute: typeof FaqsRoute
+  LanguageRoute: typeof LanguageRoute
   LoginRoute: typeof LoginRoute
+  SupportRoute: typeof SupportRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/support': {
+      id: '/support'
+      path: '/support'
+      fullPath: '/support'
+      preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/language': {
+      id: '/language'
+      path: '/language'
+      fullPath: '/language'
+      preLoaderRoute: typeof LanguageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faqs': {
+      id: '/faqs'
+      path: '/faqs'
+      fullPath: '/faqs'
+      preLoaderRoute: typeof FaqsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -266,6 +372,13 @@ declare module '@tanstack/react-router' {
       path: '/weighting-assignment'
       fullPath: '/weighting-assignment'
       preLoaderRoute: typeof AuthenticatedWeightingAssignmentRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/upload-history': {
+      id: '/_authenticated/upload-history'
+      path: '/upload-history'
+      fullPath: '/upload-history'
+      preLoaderRoute: typeof AuthenticatedUploadHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/setup': {
@@ -315,6 +428,13 @@ declare module '@tanstack/react-router' {
       path: '/bonus-assignments'
       fullPath: '/bonus-assignments'
       preLoaderRoute: typeof AuthenticatedBonusAssignmentsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/actuals-upload': {
+      id: '/_authenticated/actuals-upload'
+      path: '/actuals-upload'
+      fullPath: '/actuals-upload'
+      preLoaderRoute: typeof AuthenticatedActualsUploadRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/_setupLayout': {
@@ -391,6 +511,7 @@ const AuthenticatedSetupLayoutRouteWithChildren =
 
 interface AuthenticatedRouteChildren {
   AuthenticatedSetupLayoutRoute: typeof AuthenticatedSetupLayoutRouteWithChildren
+  AuthenticatedActualsUploadRoute: typeof AuthenticatedActualsUploadRoute
   AuthenticatedBonusAssignmentsRoute: typeof AuthenticatedBonusAssignmentsRoute
   AuthenticatedBonusSchemesRoute: typeof AuthenticatedBonusSchemesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -398,11 +519,13 @@ interface AuthenticatedRouteChildren {
   AuthenticatedKpiApprovalsRoute: typeof AuthenticatedKpiApprovalsRoute
   AuthenticatedKpiBoardRoute: typeof AuthenticatedKpiBoardRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
+  AuthenticatedUploadHistoryRoute: typeof AuthenticatedUploadHistoryRoute
   AuthenticatedWeightingAssignmentRoute: typeof AuthenticatedWeightingAssignmentRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedSetupLayoutRoute: AuthenticatedSetupLayoutRouteWithChildren,
+  AuthenticatedActualsUploadRoute: AuthenticatedActualsUploadRoute,
   AuthenticatedBonusAssignmentsRoute: AuthenticatedBonusAssignmentsRoute,
   AuthenticatedBonusSchemesRoute: AuthenticatedBonusSchemesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -410,6 +533,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedKpiApprovalsRoute: AuthenticatedKpiApprovalsRoute,
   AuthenticatedKpiBoardRoute: AuthenticatedKpiBoardRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
+  AuthenticatedUploadHistoryRoute: AuthenticatedUploadHistoryRoute,
   AuthenticatedWeightingAssignmentRoute: AuthenticatedWeightingAssignmentRoute,
 }
 
@@ -420,7 +544,11 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
+  AboutRoute: AboutRoute,
+  FaqsRoute: FaqsRoute,
+  LanguageRoute: LanguageRoute,
   LoginRoute: LoginRoute,
+  SupportRoute: SupportRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

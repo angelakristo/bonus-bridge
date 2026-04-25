@@ -231,9 +231,9 @@ function KpiApprovalsPage() {
   }
 
   return (
-    <div className="flex flex-col gap-4 p-4 md:p-6">
+    <div className="flex flex-col gap-3">
       <div>
-        <h1 className="text-2xl font-bold tracking-tight">KPI Approvals</h1>
+        <h1 className="text-xl font-bold tracking-tight">KPI Approvals</h1>
         <p className="text-sm text-muted-foreground">
           Review individual KPIs submitted for approval.
         </p>

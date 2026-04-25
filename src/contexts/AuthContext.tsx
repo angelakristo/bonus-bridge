@@ -22,7 +22,16 @@ type AuthContextValue = {
   ready: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  devPreviewSignIn: (role: UserRole) => void;
+  /** Signs in as a canonical demo persona. Requires seed data in Supabase. */
+  devPreviewSignIn: (role: UserRole) => Promise<{ error: Error | null }>;
+};
+
+/** Email addresses for the four canonical demo personas. Password: Demo2025! */
+const DEMO_EMAILS: Record<UserRole, string> = {
+  ceo:      "sofia@northwindtech.demo",
+  hr_rep:   "marcus@northwindtech.demo",
+  manager:  "priya@northwindtech.demo",
+  employee: "aisha@northwindtech.demo",
 };
 
 type HydratedAuthState = {
@@ -41,7 +50,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
   const [ready, setReady] = useState(false);
-  const devPreviewActiveRef = useRef(false);
   const resolutionIdRef = useRef(0);
 
   const loadPersonAndRoles = async (userId: string): Promise<HydratedAuthState> => {
@@ -153,7 +161,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, newSession) => {
-      if (devPreviewActiveRef.current) return;
       setTimeout(() => {
         if (cancelled) return;
         void resolveSession(newSession, `auth event:${event}`);
@@ -161,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
 
     supabase.auth.getSession().then(({ data: { session: existingSession } }) => {
-      if (cancelled || devPreviewActiveRef.current) return;
+      if (cancelled) return;
       void resolveSession(existingSession, "bootstrap");
     });
 
@@ -171,13 +178,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<{ error: Error | null }> => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error };
+    return { error: error as Error | null };
   };
 
   const signOut = async () => {
-    devPreviewActiveRef.current = false;
     setLoading(true);
     setReady(false);
     await supabase.auth.signOut();
@@ -199,39 +205,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const devPreviewSignIn = (role: UserRole) => {
-    devPreviewActiveRef.current = true;
-    const mockUserId = "dev-preview-user";
-    const mockSession = {
-      access_token: "dev-preview",
-      refresh_token: "dev-preview",
-      expires_in: 3600,
-      expires_at: Math.floor(Date.now() / 1000) + 3600,
-      token_type: "bearer",
-      user: { id: mockUserId, email: `${role}@preview.local` } as User,
-    } as unknown as Session;
-    resolutionIdRef.current += 1;
-    setSession(mockSession);
-    setSupabaseUser(mockSession.user);
-    setPerson({
-      id: "dev-preview-person",
-      entity_id: role === "hr_rep" ? null : "dev-preview-entity",
-      first_name: "Preview",
-      last_name: role.toUpperCase(),
-    });
-    setRoles([role]);
-    setLoading(false);
-    setReady(true);
-    console.log("[Auth] Dev preview sign-in", {
-      pathname: getCurrentPathname(),
-      userId: mockUserId,
-      role,
-      roles: [role],
-      entity_id: role === "hr_rep" ? null : "dev-preview-entity",
-      loading: { authLoading: false, authReady: true },
-      redirectTarget: "/",
-      reason: "manual dev preview sign-in",
-    });
+  /**
+   * Signs in as a canonical demo persona via real Supabase auth.
+   * Requires the seed data (supabase/seed.sql) to have been applied.
+   * Password for all demo accounts: Demo2025!
+   */
+  const devPreviewSignIn = async (role: UserRole): Promise<{ error: Error | null }> => {
+    const email = DEMO_EMAILS[role];
+    console.log("[Auth] Dev preview sign-in →", { role, email });
+    return signIn(email, "Demo2025!");
   };
 
   return (

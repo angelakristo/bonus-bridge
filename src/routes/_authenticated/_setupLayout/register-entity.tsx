@@ -80,9 +80,7 @@ function RegisterEntityPage() {
 
   if (authReady && !authLoading && !isHrRep) {
     return (
-      <div className="p-6">
-        <p className="text-sm text-muted-foreground">Access denied. Redirecting...</p>
-      </div>
+      <p className="text-sm text-muted-foreground">Access denied. Redirecting...</p>
     );
   }
 
@@ -152,9 +150,9 @@ function RegisterEntityPage() {
     : isExisting ? "Continue" : "Register Company";
 
   return (
-    <div className="mx-auto w-full max-w-2xl space-y-6">
+    <div className="mx-auto w-full max-w-2xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
+        <h1 className="text-xl font-semibold tracking-tight">
           {isExisting ? "Confirm your company details" : "Register your company"}
         </h1>
         <p className="text-sm text-muted-foreground">

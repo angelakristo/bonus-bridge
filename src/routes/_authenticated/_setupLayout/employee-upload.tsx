@@ -374,9 +374,9 @@ function EmployeeUploadPage() {
   const entityReady = !!entity_id && !entityLoading;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-6">
+    <div className="mx-auto max-w-4xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Employee Upload</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Employee Upload</h1>
         <p className="text-sm text-muted-foreground">
           Bulk-import your employee roster in two steps.
         </p>

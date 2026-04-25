@@ -115,9 +115,9 @@ function SetupPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Setup Checklist</h1>
+        <h1 className="text-xl font-semibold tracking-tight">Setup Checklist</h1>
         <p className="text-sm text-muted-foreground">
           Complete each step to finish configuring BonusBridge for your organisation.
           {" "}
@@ -132,7 +132,7 @@ function SetupPage() {
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
         </div>
       ) : (
-        <ol className="space-y-3">
+        <ol className="space-y-2">
           {STEPS.map((step, idx) => {
             const status: SetupStepStatus = progress[step.key] ?? "not_started";
             const meta = STATUS_META[status];

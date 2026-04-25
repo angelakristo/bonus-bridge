@@ -121,9 +121,9 @@ function RoleAssignmentPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-2xl font-semibold">Assign Roles</h1>
+        <h1 className="text-xl font-semibold">Assign Roles</h1>
         <p className="text-muted-foreground text-sm">
           Manage which roles each person holds and assign them to a functional department. A
           person must always have at least one role.

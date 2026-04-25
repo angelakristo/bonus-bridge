@@ -506,10 +506,10 @@ function WeightingAssignmentPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">
+          <h1 className="text-xl font-bold tracking-tight">
             Weighting Assignment
           </h1>
           <p className="text-sm text-muted-foreground">
@@ -617,10 +617,10 @@ function WeightingAssignmentPage() {
               </Card>
 
               <div>
-                <h2 className="mb-3 text-lg font-semibold">
+                <h2 className="mb-2 text-base font-semibold">
                   Section 2 — Item Weights
                 </h2>
-                <div className="grid grid-cols-1 gap-4">
+                <div className="grid grid-cols-1 gap-3">
                   {renderItemPanel(
                     "Corporate KPIs",
                     "corporate",

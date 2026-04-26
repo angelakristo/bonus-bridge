@@ -1,7 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
 const RoleEnum = z.enum(["ceo", "manager", "hr_rep", "employee"]);
@@ -20,7 +19,6 @@ export type UpdatePersonRolesResult = {
 };
 
 export const updatePersonRoles = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }): Promise<UpdatePersonRolesResult> => {
     const { person_id, entity_id, roles, functional_department_id } = data;

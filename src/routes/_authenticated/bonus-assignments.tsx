@@ -251,8 +251,8 @@ function BonusAssignmentsPage() {
                   <TableHead>Full Name</TableHead>
                   <TableHead>Role</TableHead>
                   <TableHead>Current Bonus Scheme</TableHead>
-                  <TableHead className="text-center">Mid-Year</TableHead>
-                  <TableHead className="text-center">Year-End</TableHead>
+                  <TableHead className="text-center">H1</TableHead>
+                  <TableHead className="text-center">Full Year</TableHead>
                   <TableHead className="w-32 text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>

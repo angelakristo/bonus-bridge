@@ -116,7 +116,7 @@ function KpiCardInner({
           </Badge>
         </div>
         <p className="text-xs text-muted-foreground pl-6">
-          Year-End Target: <span className="font-medium text-foreground">{targetDisplay}</span>
+          Full Year Target: <span className="font-medium text-foreground">{targetDisplay}</span>
         </p>
       </CardContent>
     </Card>

@@ -23,7 +23,7 @@ export type IndividualKpiDetail = {
 };
 
 type TargetRow = {
-  period: "q1" | "q2" | "q3" | "q4" | "halfyear" | "fullyear";
+  period: "q1" | "q2" | "q3" | "q4" | "h1" | "h2" | "halfyear" | "fullyear";
   target_value: number | null;
   target_binary: boolean | null;
 };
@@ -45,11 +45,13 @@ const PERIOD_LABEL: Record<TargetRow["period"], string> = {
   q2: "Q2",
   q3: "Q3",
   q4: "Q4",
-  halfyear: "Mid-Year",
-  fullyear: "Year-End",
+  h1: "H1",
+  halfyear: "H1",
+  h2: "H2",
+  fullyear: "Full Year",
 };
 
-const PERIOD_ORDER: TargetRow["period"][] = ["q1", "q2", "q3", "q4", "halfyear", "fullyear"];
+const PERIOD_ORDER: TargetRow["period"][] = ["q1", "q2", "q3", "q4", "h1", "h2", "fullyear"];
 
 type Props = {
   open: boolean;
@@ -83,11 +85,18 @@ export function KpiDetailModal({ open, onOpenChange, kpi }: Props) {
 
   const ds = DRIVER_STYLE[kpi.driver];
   const isBinary = kpi.kpi_type === "binary";
-  const visiblePeriods = isBinary
-    ? (["halfyear", "fullyear"] as TargetRow["period"][])
-    : PERIOD_ORDER;
-
   const targetByPeriod = new Map(targets.map((t) => [t.period, t]));
+
+  // For binary KPIs show h1 (or legacy halfyear) and fullyear only.
+  // For numeric, suppress legacy halfyear rows when h1 data is present.
+  const visiblePeriods = isBinary
+    ? (["h1", "halfyear", "fullyear"] as TargetRow["period"][]).filter(
+        (p) => targetByPeriod.has(p) || p === "fullyear",
+      )
+    : PERIOD_ORDER.filter((p) => {
+        if (p === "halfyear") return targetByPeriod.has("halfyear") && !targetByPeriod.has("h1");
+        return true;
+      });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

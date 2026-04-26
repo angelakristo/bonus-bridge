@@ -172,9 +172,9 @@ export function AssignBonusModal({
 
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
-              <Label htmlFor="midyear-toggle">Mid-Year Eligible</Label>
+              <Label htmlFor="midyear-toggle">H1 Eligible</Label>
               <p className="text-xs text-muted-foreground">
-                Eligible for mid-year bonus payout.
+                Eligible for H1 bonus payout.
               </p>
             </div>
             <Switch
@@ -186,9 +186,9 @@ export function AssignBonusModal({
 
           <div className="flex items-center justify-between rounded-md border p-3">
             <div>
-              <Label htmlFor="yearend-toggle">Year-End Eligible</Label>
+              <Label htmlFor="yearend-toggle">Full Year Eligible</Label>
               <p className="text-xs text-muted-foreground">
-                Eligible for year-end bonus payout.
+                Eligible for full year bonus payout.
               </p>
             </div>
             <Switch

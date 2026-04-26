@@ -8,8 +8,9 @@ const PERIODS: { value: Period; label: string }[] = [
   { value: "q2", label: "Q2" },
   { value: "q3", label: "Q3" },
   { value: "q4", label: "Q4" },
-  { value: "halfyear", label: "Mid-Year" },
-  { value: "fullyear", label: "Year-End" },
+  { value: "h1", label: "H1" },
+  { value: "h2", label: "H2" },
+  { value: "fullyear", label: "Full Year" },
 ];
 
 type PeriodToggleProps = {

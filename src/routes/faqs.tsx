@@ -23,7 +23,7 @@ const FAQS = [
   },
   {
     q: "What periods are tracked?",
-    a: "KPI actuals are tracked across six periods: Q1, Q2, Q3, Q4, Mid-Year (H1), and Year-End (Full Year). Your manager or HR rep uploads actuals on a quarterly or half-yearly basis.",
+    a: "KPI actuals are tracked across seven periods: Q1, Q2, Q3, Q4, H1 (Q1+Q2), H2 (Q3+Q4), and Full Year (H1+H2). Your manager or HR rep uploads actuals on a quarterly or half-yearly basis.",
   },
   {
     q: "I forgot my password. What do I do?",

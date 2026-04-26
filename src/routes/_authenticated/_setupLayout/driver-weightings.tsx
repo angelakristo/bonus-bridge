@@ -149,7 +149,10 @@ function DriverWeightingsPage() {
       toast.success(`Driver weightings saved for ${selected_year}.`);
     } catch (err) {
       console.error("[DriverWeightings] save error", err);
-      const msg = err instanceof Error ? err.message : "Unknown error";
+      const msg =
+        err instanceof Error
+          ? err.message
+          : (err as { message?: string })?.message ?? JSON.stringify(err);
       toast.error(`Failed to save: ${msg}`);
     } finally {
       setSaving(false);

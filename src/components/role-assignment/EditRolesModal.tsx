@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useServerFn } from "@tanstack/react-start";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -20,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { updatePersonRoles } from "@/integrations/supabase/role-assignment.functions";
+import { supabase } from "@/integrations/supabase/client";
 import type { UserRole } from "@/components/role-assignment/RoleChip";
 
 const ALL_ROLES: { role: UserRole; label: string }[] = [
@@ -52,10 +51,9 @@ export function EditRolesModal({
   currentRoles,
   currentFunctionalDepartmentId,
   functionalDepartments,
-  entity_id,
+  entity_id: _entity_id,
   onSaved,
 }: Props) {
-  const updateFn = useServerFn(updatePersonRoles);
   const [selected, setSelected] = useState<Set<UserRole>>(new Set(currentRoles));
   const [funcDeptId, setFuncDeptId] = useState<string | null>(currentFunctionalDepartmentId);
   const [error, setError] = useState<string | null>(null);
@@ -90,18 +88,47 @@ export function EditRolesModal({
 
     setSaving(true);
     try {
-      const result = await updateFn({
-        data: {
-          person_id: person.id,
-          entity_id,
-          roles: rolesArr,
-          functional_department_id: funcDeptId,
-        },
-      });
-      if (!result.ok) {
-        setError(result.error ?? "Failed to update roles");
-        return;
+      // Fetch current roles
+      const { data: currentData, error: fetchErr } = await supabase
+        .from("people_roles")
+        .select("role")
+        .eq("person_id", person.id);
+      if (fetchErr) throw new Error(`Failed to load existing roles: ${fetchErr.message}`);
+
+      const existing = new Set((currentData ?? []).map((r) => r.role));
+      const next = new Set(selected);
+      const toAdd = Array.from(selected).filter((r) => !existing.has(r));
+      const toRemove = Array.from(existing).filter((r) => !next.has(r));
+
+      if (toAdd.length > 0) {
+        const { error: addErr } = await supabase
+          .from("people_roles")
+          .insert(toAdd.map((role) => ({ person_id: person.id, role })));
+        if (addErr) throw new Error(`Failed to add roles: ${addErr.message}`);
       }
+      if (toRemove.length > 0) {
+        const { error: delErr } = await supabase
+          .from("people_roles")
+          .delete()
+          .eq("person_id", person.id)
+          .in("role", toRemove);
+        if (delErr) throw new Error(`Failed to remove roles: ${delErr.message}`);
+      }
+
+      // Sync functional department
+      const { error: delFuncErr } = await supabase
+        .from("people_functional_departments")
+        .delete()
+        .eq("person_id", person.id);
+      if (delFuncErr) throw new Error(`Failed to clear department: ${delFuncErr.message}`);
+
+      if (funcDeptId) {
+        const { error: insFuncErr } = await supabase
+          .from("people_functional_departments")
+          .insert({ person_id: person.id, functional_department_id: funcDeptId });
+        if (insFuncErr) throw new Error(`Failed to set department: ${insFuncErr.message}`);
+      }
+
       toast.success("Roles updated");
       onOpenChange(false);
       onSaved();

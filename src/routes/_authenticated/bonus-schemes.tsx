@@ -69,6 +69,7 @@ function BonusSchemesPage() {
   const [rows, setRows] = useState<SchemeRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
+  const [editingScheme, setEditingScheme] = useState<{ id: string; name: string; description: string | null } | null>(null);
 
   // Per-scheme tier state
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
@@ -268,7 +269,7 @@ function BonusSchemesPage() {
                               variant="outline"
                               size="sm"
                               onClick={() =>
-                                toast.info("Edit scheme — coming soon.")
+                                setEditingScheme({ id: s.id, name: s.name, description: s.description })
                               }
                             >
                               <Pencil className="mr-1.5 h-3.5 w-3.5" />
@@ -378,6 +379,17 @@ function BonusSchemesPage() {
           onOpenChange={setAddOpen}
           entityId={entity_id}
           onCreated={load}
+        />
+      )}
+
+      {entity_id && (
+        <AddBonusSchemeModal
+          open={editingScheme !== null}
+          onOpenChange={(o) => { if (!o) setEditingScheme(null); }}
+          entityId={entity_id}
+          editing={editingScheme ?? undefined}
+          onCreated={() => {}}
+          onUpdated={() => { setEditingScheme(null); void load(); }}
         />
       )}
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -16,23 +16,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
+type EditingScheme = { id: string; name: string; description: string | null };
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entityId: string;
+  editing?: EditingScheme;
   onCreated: () => void;
+  onUpdated?: () => void;
 };
 
 export function AddBonusSchemeModal({
   open,
   onOpenChange,
   entityId,
+  editing,
   onCreated,
+  onUpdated,
 }: Props) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState(editing?.name ?? "");
+  const [description, setDescription] = useState(editing?.description ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setName(editing?.name ?? "");
+      setDescription(editing?.description ?? "");
+      setError(null);
+    }
+  }, [open, editing]);
 
   const reset = () => {
     setName("");
@@ -49,59 +63,88 @@ export function AddBonusSchemeModal({
     setSaving(true);
     setError(null);
 
-    const { data: existing, error: checkErr } = await supabase
-      .from("bonus_schemes")
-      .select("id")
-      .eq("entity_id", entityId)
-      .ilike("name", trimmed)
-      .maybeSingle();
+    // Uniqueness check — when editing, exclude the current scheme
+    const nameChanged = !editing || trimmed.toLowerCase() !== editing.name.toLowerCase();
+    if (nameChanged) {
+      const { data: existing, error: checkErr } = await supabase
+        .from("bonus_schemes")
+        .select("id")
+        .eq("entity_id", entityId)
+        .ilike("name", trimmed)
+        .maybeSingle();
 
-    if (checkErr) {
-      console.error("[BonusScheme] uniqueness check failed", checkErr);
-      setError("Could not verify scheme name. Please try again.");
+      if (checkErr) {
+        console.error("[BonusScheme] uniqueness check failed", checkErr);
+        setError("Could not verify scheme name. Please try again.");
+        setSaving(false);
+        return;
+      }
+
+      if (existing) {
+        setError("A bonus scheme with this name already exists.");
+        setSaving(false);
+        return;
+      }
+    }
+
+    if (editing) {
+      const { error: updateErr } = await supabase
+        .from("bonus_schemes")
+        .update({
+          name: trimmed,
+          description: description.trim() || null,
+        })
+        .eq("id", editing.id);
+
       setSaving(false);
-      return;
-    }
 
-    if (existing) {
-      setError("A bonus scheme with this name already exists.");
+      if (updateErr) {
+        console.error("[BonusScheme] update failed", updateErr);
+        setError("Failed to update bonus scheme.");
+        return;
+      }
+
+      toast.success(`Bonus scheme "${trimmed}" updated.`);
+      onOpenChange(false);
+      onUpdated?.();
+    } else {
+      const { error: insertErr } = await supabase.from("bonus_schemes").insert({
+        entity_id: entityId,
+        name: trimmed,
+        description: description.trim() ? description.trim() : null,
+        is_active: true,
+      });
+
       setSaving(false);
-      return;
+
+      if (insertErr) {
+        console.error("[BonusScheme] insert failed", insertErr);
+        setError("Failed to create bonus scheme.");
+        return;
+      }
+
+      toast.success(`Bonus scheme "${trimmed}" created.`);
+      reset();
+      onOpenChange(false);
+      onCreated();
     }
-
-    const { error: insertErr } = await supabase.from("bonus_schemes").insert({
-      entity_id: entityId,
-      name: trimmed,
-      description: description.trim() ? description.trim() : null,
-    });
-
-    setSaving(false);
-
-    if (insertErr) {
-      console.error("[BonusScheme] insert failed", insertErr);
-      setError("Failed to create bonus scheme.");
-      return;
-    }
-
-    toast.success(`Bonus scheme "${trimmed}" created.`);
-    reset();
-    onOpenChange(false);
-    onCreated();
   };
 
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (!o) reset();
+        if (!o && !editing) reset();
         onOpenChange(o);
       }}
     >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Bonus Scheme</DialogTitle>
+          <DialogTitle>{editing ? "Edit Bonus Scheme" : "Add Bonus Scheme"}</DialogTitle>
           <DialogDescription>
-            Create a new bonus scheme for your organisation.
+            {editing
+              ? "Update the name and description of this bonus scheme."
+              : "Create a new bonus scheme for your organisation."}
           </DialogDescription>
         </DialogHeader>
 
@@ -143,7 +186,7 @@ export function AddBonusSchemeModal({
           </Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save scheme
+            {editing ? "Save changes" : "Save scheme"}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,13 +50,14 @@ export type AddKpiFormValues = {
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  level: KpiLevel;
+  /** When omitted the modal renders a level-picker at the top. */
+  level?: KpiLevel;
   onSuccess: () => void;
-  /** Required when level === "department" */
+  /** Pre-set when level === "department" and called from the KPI Board. */
   org_department_id?: string | null;
-  /** Required when level === "department" */
+  /** Pre-set when level === "department" and called from the KPI Board. */
   functional_department_id?: string | null;
-  /** Required when level === "individual" */
+  /** Pre-set when level === "individual" and called from the KPI Board. */
   person_id?: string | null;
 };
 
@@ -112,11 +113,11 @@ function parseNum(s: string): number | null {
 export function AddKpiModal({
   open,
   onOpenChange,
-  level,
+  level: levelProp,
   onSuccess,
-  org_department_id = null,
+  org_department_id: orgDeptIdProp = null,
   functional_department_id = null,
-  person_id: target_person_id = null,
+  person_id: personIdProp = null,
 }: Props) {
   const { person } = useAuth();
   const { entity_id } = useEntity();
@@ -125,6 +126,34 @@ export function AddKpiModal({
   const [values, setValues] = useState<AddKpiFormValues>(EMPTY);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Internal state used only when levelProp is not provided (sidebar "Add KPI" button)
+  const [internalLevel, setInternalLevel] = useState<KpiLevel>("corporate");
+  const [selectedOrgDeptId, setSelectedOrgDeptId] = useState<string>("");
+  const [selectedPersonId, setSelectedPersonId] = useState<string>("");
+  const [orgDepts, setOrgDepts] = useState<{ id: string; name: string }[]>([]);
+  const [people, setPeople] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+
+  const effectiveLevel = levelProp ?? internalLevel;
+  const effectiveOrgDeptId = orgDeptIdProp ?? (effectiveLevel === "department" ? selectedOrgDeptId || null : null);
+  const effectivePersonId = personIdProp ?? (effectiveLevel === "individual" ? selectedPersonId || null : null);
+
+  // Fetch departments + people for the internal selectors when levelProp is absent
+  useEffect(() => {
+    if (!open || levelProp || !entity_id) return;
+    supabase
+      .from("organisational_departments")
+      .select("id, name")
+      .eq("entity_id", entity_id)
+      .order("name")
+      .then(({ data }) => setOrgDepts(data ?? []));
+    supabase
+      .from("people")
+      .select("id, first_name, last_name")
+      .eq("entity_id", entity_id)
+      .order("last_name")
+      .then(({ data }) => setPeople(data ?? []));
+  }, [open, levelProp, entity_id]);
 
   const update = <K extends keyof AddKpiFormValues>(
     key: K,
@@ -175,11 +204,11 @@ export function AddKpiModal({
 
     if (!entity_id) return toast.error("No entity selected.");
     if (!person?.id) return toast.error("Cannot identify current user.");
-    if (level === "department" && !org_department_id && !functional_department_id) {
-      return toast.error("Department context is required.");
+    if (effectiveLevel === "department" && !effectiveOrgDeptId && !functional_department_id) {
+      return toast.error("Please select a department.");
     }
-    if (level === "individual" && !target_person_id) {
-      return toast.error("Person context is required.");
+    if (effectiveLevel === "individual" && !effectivePersonId) {
+      return toast.error("Please select an employee.");
     }
 
     setSaving(true);
@@ -207,7 +236,7 @@ export function AddKpiModal({
       const kpiDefinitionId = defRes.data.id;
       const isBinary = values.kpi_type === "binary";
 
-      if (level === "corporate") {
+      if (effectiveLevel === "corporate") {
         const countRes = await supabase
           .from("corporate_kpis")
           .select("id", { count: "exact", head: true })
@@ -231,9 +260,9 @@ export function AddKpiModal({
           const tRes = await supabase.from("corporate_kpi_targets").insert(targetRows as never);
           if (tRes.error) throw new Error(tRes.error.message);
         }
-      } else if (level === "department") {
-        const filterCol = org_department_id ? "org_department_id" : "functional_department_id";
-        const filterVal = (org_department_id ?? functional_department_id) as string;
+      } else if (effectiveLevel === "department") {
+        const filterCol = effectiveOrgDeptId ? "org_department_id" : "functional_department_id";
+        const filterVal = (effectiveOrgDeptId ?? functional_department_id) as string;
         const countRes = await supabase
           .from("department_kpis")
           .select("id", { count: "exact", head: true })
@@ -250,7 +279,7 @@ export function AddKpiModal({
             kpi_definition_id: kpiDefinitionId,
             year: selected_year,
             display_order,
-            org_department_id: org_department_id ?? null,
+            org_department_id: effectiveOrgDeptId ?? null,
             functional_department_id: functional_department_id ?? null,
           })
           .select("id")
@@ -271,7 +300,7 @@ export function AddKpiModal({
           .select("id", { count: "exact", head: true })
           .eq("entity_id", entity_id)
           .eq("year", selected_year)
-          .eq("person_id", target_person_id as string);
+          .eq("person_id", effectivePersonId as string);
         if (countRes.error) throw new Error(countRes.error.message);
         const display_order = (countRes.count ?? 0) + 1;
 
@@ -279,7 +308,7 @@ export function AddKpiModal({
           .from("individual_kpis")
           .insert({
             entity_id,
-            person_id: target_person_id as string,
+            person_id: effectivePersonId as string,
             kpi_definition_id: kpiDefinitionId,
             year: selected_year,
             display_order,
@@ -301,10 +330,13 @@ export function AddKpiModal({
         }
       }
 
-      toast.success(`${LEVEL_LABEL[level]} KPI added.`);
+      toast.success(`${LEVEL_LABEL[effectiveLevel]} KPI added.`);
       onSuccess();
       setValues(EMPTY);
       setTitleError(null);
+      setInternalLevel("corporate");
+      setSelectedOrgDeptId("");
+      setSelectedPersonId("");
       onOpenChange(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -320,6 +352,9 @@ export function AddKpiModal({
     if (saving) return;
     setValues(EMPTY);
     setTitleError(null);
+    setInternalLevel("corporate");
+    setSelectedOrgDeptId("");
+    setSelectedPersonId("");
     onOpenChange(false);
   };
 
@@ -336,13 +371,73 @@ export function AddKpiModal({
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Add {LEVEL_LABEL[level]} KPI</DialogTitle>
+          <DialogTitle>Add {LEVEL_LABEL[effectiveLevel]} KPI</DialogTitle>
           <DialogDescription>
             Define the KPI details and set targets by quarter.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
+          {/* Level selector — only shown when level is not pre-set by the caller */}
+          {!levelProp && (
+            <div className="space-y-1.5">
+              <Label>Assign to</Label>
+              <Select
+                value={internalLevel}
+                onValueChange={(v) => {
+                  setInternalLevel(v as KpiLevel);
+                  setSelectedOrgDeptId("");
+                  setSelectedPersonId("");
+                }}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="corporate">Corporate</SelectItem>
+                  <SelectItem value="department">Department</SelectItem>
+                  <SelectItem value="individual">Individual Employee</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Department picker — shown when level is "department" and no dept pre-set */}
+          {effectiveLevel === "department" && !orgDeptIdProp && !functional_department_id && (
+            <div className="space-y-1.5">
+              <Label>Department <span className="text-destructive">*</span></Label>
+              <Select value={selectedOrgDeptId} onValueChange={setSelectedOrgDeptId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select department" />
+                </SelectTrigger>
+                <SelectContent>
+                  {orgDepts.map((d) => (
+                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Person picker — shown when level is "individual" and no person pre-set */}
+          {effectiveLevel === "individual" && !personIdProp && (
+            <div className="space-y-1.5">
+              <Label>Employee <span className="text-destructive">*</span></Label>
+              <Select value={selectedPersonId} onValueChange={setSelectedPersonId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select employee" />
+                </SelectTrigger>
+                <SelectContent>
+                  {people.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.first_name} {p.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Title */}
           <div className="space-y-1.5">
             <Label htmlFor="kpi-title">

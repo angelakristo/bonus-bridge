@@ -55,16 +55,17 @@ function SetupPage() {
         return;
       }
 
-      const [progressRes, orgDeptRes, peopleRes] = await Promise.all([
+      const [progressRes, orgDeptRes, uploadsRes] = await Promise.all([
         supabase.from("setup_progress").select("step_key, status").eq("entity_id", entity_id),
         supabase
           .from("organisational_departments")
           .select("id", { head: true, count: "exact" })
           .eq("entity_id", entity_id),
         supabase
-          .from("people")
+          .from("excel_uploads")
           .select("id", { head: true, count: "exact" })
-          .eq("entity_id", entity_id),
+          .eq("entity_id", entity_id)
+          .eq("upload_type", "employees"),
       ]);
 
       if (cancelled) return;
@@ -82,7 +83,7 @@ function SetupPage() {
       derived.build_org_departments =
         (orgDeptRes.count ?? 0) > 0 ? "complete" : derived.build_org_departments ?? "not_started";
       derived.upload_employees =
-        (peopleRes.count ?? 0) > 0 ? "complete" : derived.upload_employees ?? "not_started";
+        (uploadsRes.count ?? 0) > 0 ? "complete" : derived.upload_employees ?? "not_started";
 
       setProgress(derived);
       setLoading(false);

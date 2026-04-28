@@ -10,12 +10,15 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as MasterRouteImport } from './routes/master'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as LanguageRouteImport } from './routes/language'
 import { Route as FaqsRouteImport } from './routes/faqs'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MasterIndexRouteImport } from './routes/master/index'
+import { Route as MasterNewProjectRouteImport } from './routes/master/new-project'
 import { Route as AuthenticatedWeightingAssignmentRouteImport } from './routes/_authenticated/weighting-assignment'
 import { Route as AuthenticatedUploadHistoryRouteImport } from './routes/_authenticated/upload-history'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
@@ -36,6 +39,11 @@ import { Route as AuthenticatedSetupLayoutDriverWeightingsRouteImport } from './
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MasterRoute = MasterRouteImport.update({
+  id: '/master',
+  path: '/master',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -66,6 +74,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const MasterIndexRoute = MasterIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MasterRoute,
+} as any)
+const MasterNewProjectRoute = MasterNewProjectRouteImport.update({
+  id: '/new-project',
+  path: '/new-project',
+  getParentRoute: () => MasterRoute,
 } as any)
 const AuthenticatedWeightingAssignmentRoute =
   AuthenticatedWeightingAssignmentRouteImport.update({
@@ -166,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/faqs': typeof FaqsRoute
   '/language': typeof LanguageRoute
   '/login': typeof LoginRoute
+  '/master': typeof MasterRouteWithChildren
   '/support': typeof SupportRoute
   '/actuals-upload': typeof AuthenticatedActualsUploadRoute
   '/bonus-assignments': typeof AuthenticatedBonusAssignmentsRoute
@@ -177,6 +196,8 @@ export interface FileRoutesByFullPath {
   '/setup': typeof AuthenticatedSetupRoute
   '/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
+  '/master/new-project': typeof MasterNewProjectRoute
+  '/master/': typeof MasterIndexRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
@@ -200,6 +221,8 @@ export interface FileRoutesByTo {
   '/setup': typeof AuthenticatedSetupRoute
   '/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
+  '/master/new-project': typeof MasterNewProjectRoute
+  '/master': typeof MasterIndexRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
@@ -214,6 +237,7 @@ export interface FileRoutesById {
   '/faqs': typeof FaqsRoute
   '/language': typeof LanguageRoute
   '/login': typeof LoginRoute
+  '/master': typeof MasterRouteWithChildren
   '/support': typeof SupportRoute
   '/_authenticated/_setupLayout': typeof AuthenticatedSetupLayoutRouteWithChildren
   '/_authenticated/actuals-upload': typeof AuthenticatedActualsUploadRoute
@@ -226,6 +250,8 @@ export interface FileRoutesById {
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
   '/_authenticated/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/_authenticated/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
+  '/master/new-project': typeof MasterNewProjectRoute
+  '/master/': typeof MasterIndexRoute
   '/_authenticated/_setupLayout/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
   '/_authenticated/_setupLayout/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
@@ -240,6 +266,7 @@ export interface FileRouteTypes {
     | '/faqs'
     | '/language'
     | '/login'
+    | '/master'
     | '/support'
     | '/actuals-upload'
     | '/bonus-assignments'
@@ -251,6 +278,8 @@ export interface FileRouteTypes {
     | '/setup'
     | '/upload-history'
     | '/weighting-assignment'
+    | '/master/new-project'
+    | '/master/'
     | '/driver-weightings'
     | '/employee-upload'
     | '/org-departments'
@@ -274,6 +303,8 @@ export interface FileRouteTypes {
     | '/setup'
     | '/upload-history'
     | '/weighting-assignment'
+    | '/master/new-project'
+    | '/master'
     | '/driver-weightings'
     | '/employee-upload'
     | '/org-departments'
@@ -287,6 +318,7 @@ export interface FileRouteTypes {
     | '/faqs'
     | '/language'
     | '/login'
+    | '/master'
     | '/support'
     | '/_authenticated/_setupLayout'
     | '/_authenticated/actuals-upload'
@@ -299,6 +331,8 @@ export interface FileRouteTypes {
     | '/_authenticated/setup'
     | '/_authenticated/upload-history'
     | '/_authenticated/weighting-assignment'
+    | '/master/new-project'
+    | '/master/'
     | '/_authenticated/_setupLayout/driver-weightings'
     | '/_authenticated/_setupLayout/employee-upload'
     | '/_authenticated/_setupLayout/org-departments'
@@ -313,6 +347,7 @@ export interface RootRouteChildren {
   FaqsRoute: typeof FaqsRoute
   LanguageRoute: typeof LanguageRoute
   LoginRoute: typeof LoginRoute
+  MasterRoute: typeof MasterRouteWithChildren
   SupportRoute: typeof SupportRoute
 }
 
@@ -323,6 +358,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support'
       preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/master': {
+      id: '/master'
+      path: '/master'
+      fullPath: '/master'
+      preLoaderRoute: typeof MasterRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -366,6 +408,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/master/': {
+      id: '/master/'
+      path: '/'
+      fullPath: '/master/'
+      preLoaderRoute: typeof MasterIndexRouteImport
+      parentRoute: typeof MasterRoute
+    }
+    '/master/new-project': {
+      id: '/master/new-project'
+      path: '/new-project'
+      fullPath: '/master/new-project'
+      preLoaderRoute: typeof MasterNewProjectRouteImport
+      parentRoute: typeof MasterRoute
     }
     '/_authenticated/weighting-assignment': {
       id: '/_authenticated/weighting-assignment'
@@ -541,6 +597,19 @@ const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(
   AuthenticatedRouteChildren,
 )
 
+interface MasterRouteChildren {
+  MasterNewProjectRoute: typeof MasterNewProjectRoute
+  MasterIndexRoute: typeof MasterIndexRoute
+}
+
+const MasterRouteChildren: MasterRouteChildren = {
+  MasterNewProjectRoute: MasterNewProjectRoute,
+  MasterIndexRoute: MasterIndexRoute,
+}
+
+const MasterRouteWithChildren =
+  MasterRoute._addFileChildren(MasterRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRoute: AuthenticatedRouteWithChildren,
@@ -548,6 +617,7 @@ const rootRouteChildren: RootRouteChildren = {
   FaqsRoute: FaqsRoute,
   LanguageRoute: LanguageRoute,
   LoginRoute: LoginRoute,
+  MasterRoute: MasterRouteWithChildren,
   SupportRoute: SupportRoute,
 }
 export const routeTree = rootRouteImport

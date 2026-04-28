@@ -5,6 +5,7 @@ import { Sparkles, Globe, ChevronDown } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
+import { useMasterAuth } from "@/contexts/MasterAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import bonusbridgeFull from "@/assets/bonusbridge-full.png";
@@ -487,6 +488,7 @@ export const Route = createFileRoute("/login")({
 function LoginPage() {
   const { session, ready: authReady, loading: authLoading, roles, signIn, devPreviewSignIn } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
+  const { isMaster, masterSignIn } = useMasterAuth();
   const navigate = useNavigate();
   const search = Route.useSearch();
 
@@ -495,17 +497,30 @@ function LoginPage() {
   const [submitting, setSubmitting] = useState(false);
   const [previewing, setPreviewing] = useState(false);
 
-  // Auth redirect
+  // If already master, go straight to master portal
   useEffect(() => {
-    if (!authReady || authLoading || entityLoading || !session) return;
+    if (isMaster) { navigate({ to: "/master", replace: true }); }
+  }, [isMaster, navigate]);
+
+  // Normal Supabase auth redirect
+  useEffect(() => {
+    if (isMaster || !authReady || authLoading || entityLoading || !session) return;
     if (search.redirect) { navigate({ to: search.redirect, replace: true }); return; }
     if (roles.includes("hr_rep") && !entity_id) { navigate({ to: "/register-entity", replace: true }); return; }
     navigate({ to: "/dashboard", replace: true });
-  }, [authReady, authLoading, entityLoading, session, roles, entity_id, navigate, search.redirect]);
+  }, [isMaster, authReady, authLoading, entityLoading, session, roles, entity_id, navigate, search.redirect]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+
+    // Check master credentials first (client-side only, no Supabase call)
+    if (masterSignIn(email, password)) {
+      setSubmitting(false);
+      navigate({ to: "/master", replace: true });
+      return;
+    }
+
     const { error } = await signIn(email, password);
     setSubmitting(false);
     if (error) { toast.error(error.message || "Failed to sign in"); return; }

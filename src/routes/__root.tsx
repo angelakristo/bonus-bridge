@@ -4,6 +4,7 @@ import appCss from "../styles.css?url";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { EntityProvider } from "@/contexts/EntityContext";
 import { YearProvider } from "@/contexts/YearContext";
+import { MasterAuthProvider } from "@/contexts/MasterAuthContext";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -70,13 +71,15 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function RootComponent() {
   return (
-    <AuthProvider>
-      <EntityProvider>
-        <YearProvider>
-          <Outlet />
-          <Toaster />
-        </YearProvider>
-      </EntityProvider>
-    </AuthProvider>
+    <MasterAuthProvider>
+      <AuthProvider>
+        <EntityProvider>
+          <YearProvider>
+            <Outlet />
+            <Toaster />
+          </YearProvider>
+        </EntityProvider>
+      </AuthProvider>
+    </MasterAuthProvider>
   );
 }

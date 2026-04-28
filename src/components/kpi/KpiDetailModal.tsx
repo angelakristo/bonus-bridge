@@ -20,6 +20,7 @@ export type IndividualKpiDetail = {
   kpi_type: "progressive" | "binary" | "benchmark";
   unit: string | null;
   status: "draft" | "pending_approval" | "approved" | "rejected";
+  approval_note: string | null;
 };
 
 type TargetRow = {
@@ -117,6 +118,15 @@ export function KpiDetailModal({ open, onOpenChange, kpi }: Props) {
             <div>
               <p className="text-xs font-medium text-muted-foreground">Description</p>
               <p className="text-sm">{kpi.description}</p>
+            </div>
+          )}
+
+          {kpi.approval_note && (
+            <div className={`rounded-md border p-3 ${kpi.status === "rejected" ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
+              <p className="text-xs font-medium text-muted-foreground mb-1">
+                {kpi.status === "rejected" ? "Rejection reason" : "Manager's note"}
+              </p>
+              <p className="text-sm">{kpi.approval_note}</p>
             </div>
           )}
 

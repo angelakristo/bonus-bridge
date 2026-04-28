@@ -79,7 +79,7 @@ function IndividualKpiProposalPage() {
     const { data, error } = await supabase
       .from("individual_kpis")
       .select(
-        "id, status, kpi_definitions(id, title, description, driver, kpi_type, unit)",
+        "id, status, approval_note, kpi_definitions(id, title, description, driver, kpi_type, unit)",
       )
       .eq("entity_id", entity_id)
       .eq("person_id", person.id)
@@ -113,6 +113,7 @@ function IndividualKpiProposalPage() {
           kpi_type: def.kpi_type,
           unit: def.unit,
           status: r.status as Status,
+          approval_note: (r as { approval_note?: string | null }).approval_note ?? null,
         };
       })
       .filter((r): r is IndividualKpiDetail => r !== null);

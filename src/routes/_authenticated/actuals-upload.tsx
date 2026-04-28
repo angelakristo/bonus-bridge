@@ -126,7 +126,7 @@ function ActualsUploadPage() {
         person_id: string;
         kpi_definition_id: string;
         kpi_level: "individual";
-        period: string;
+        period: "q1" | "q2" | "q3" | "q4" | "h1" | "h2" | "halfyear" | "fullyear";
         actual_value: number | null;
         actual_binary: boolean | null;
         source: string;
@@ -220,7 +220,7 @@ function ActualsUploadPage() {
             person_id: emailToId[email],
             kpi_definition_id: titleToId[kpiTitle],
             kpi_level: "individual",
-            period,
+            period: period as ActualInsert["period"],
             actual_value: hasValue ? Number(actualValueRaw) : null,
             actual_binary: hasBinary ? parseBinaryValue(actualBinaryRaw) : null,
             source: "excel_upload",

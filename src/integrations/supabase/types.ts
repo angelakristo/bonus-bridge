@@ -1179,6 +1179,7 @@ export type Database = {
           person_id: string | null
           unit: string | null
           uploaded_at: string | null
+          year: number | null
         }
         Relationships: [
           {

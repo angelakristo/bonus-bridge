@@ -40,25 +40,30 @@ export const STEPS: SetupStep[] = [
     key: "configure_corporate_kpis",
     title: "Configure Corporate KPIs",
     description: "Define the KPIs that apply company-wide.",
+    route: "/kpi-board",
   },
   {
     key: "configure_department_kpis",
     title: "Configure Department KPIs",
     description: "Define KPIs for each department.",
+    route: "/kpi-board",
   },
   {
     key: "employee_kpi_proposals",
     title: "Employee KPI Proposals",
     description: "Review and approve individual KPI proposals.",
+    route: "/kpi-approvals",
   },
   {
     key: "assign_weightings",
     title: "Assign Weightings",
     description: "Set how corporate / department / individual KPIs weigh per employee.",
+    route: "/weighting-assignment",
   },
   {
     key: "assign_bonus_schemes",
     title: "Assign Bonus Schemes",
     description: "Link each employee to a bonus scheme and tier.",
+    route: "/bonus-assignments",
   },
 ];

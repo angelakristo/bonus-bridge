@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { FileText, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useEntity } from "@/contexts/EntityContext";
@@ -10,8 +10,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { PeriodToggle, type Period } from "./PeriodToggle";
 import { AchievementBadge } from "./AchievementBadge";
+import { CeoReportModal } from "./CeoReportModal";
 import { cn } from "@/lib/utils";
 
 type KpiRow = {
@@ -55,7 +57,7 @@ function fmt(val: number | null, unit: string | null) {
 }
 
 export function CeoDashboard() {
-  const { entity_id } = useEntity();
+  const { entity_id, entity_name } = useEntity();
   const { selected_year } = useYear();
 
   const [period, setPeriod] = useState<Period>("q1");
@@ -64,6 +66,7 @@ export function CeoDashboard() {
   const [personMap, setPersonMap] = useState<Record<string, string>>({});
   const [driverWeights, setDriverWeights] = useState<DriverWeights | null>(null);
   const [loading, setLoading] = useState(true);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const load = useCallback(async () => {
     if (!entity_id) return;
@@ -137,7 +140,19 @@ export function CeoDashboard() {
           <h1 className="text-xl font-bold tracking-tight">Company Performance</h1>
           <p className="text-sm text-muted-foreground">{selected_year}</p>
         </div>
-        <PeriodToggle value={period} onChange={setPeriod} />
+        <div className="flex items-center gap-2 flex-wrap">
+          <PeriodToggle value={period} onChange={setPeriod} />
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 shrink-0 h-8 text-xs"
+            disabled={loading}
+            onClick={() => setReportOpen(true)}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            Generate Report
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -276,6 +291,14 @@ export function CeoDashboard() {
           </Card>
         </div>
       )}
+
+      <CeoReportModal
+        open={reportOpen}
+        onOpenChange={setReportOpen}
+        entityId={entity_id}
+        entityName={entity_name}
+        year={selected_year}
+      />
     </div>
   );
 }

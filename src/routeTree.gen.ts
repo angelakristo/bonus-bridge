@@ -30,11 +30,14 @@ import { Route as AuthenticatedBonusSchemesRouteImport } from './routes/_authent
 import { Route as AuthenticatedBonusAssignmentsRouteImport } from './routes/_authenticated/bonus-assignments'
 import { Route as AuthenticatedActualsUploadRouteImport } from './routes/_authenticated/actuals-upload'
 import { Route as AuthenticatedSetupLayoutRouteImport } from './routes/_authenticated/_setupLayout'
+import { Route as AuthenticatedSetupLayoutTeamSetupRouteImport } from './routes/_authenticated/_setupLayout/team-setup'
 import { Route as AuthenticatedSetupLayoutRoleAssignmentRouteImport } from './routes/_authenticated/_setupLayout/role-assignment'
 import { Route as AuthenticatedSetupLayoutRegisterEntityRouteImport } from './routes/_authenticated/_setupLayout/register-entity'
 import { Route as AuthenticatedSetupLayoutOrgDepartmentsRouteImport } from './routes/_authenticated/_setupLayout/org-departments'
+import { Route as AuthenticatedSetupLayoutKpiSetupRouteImport } from './routes/_authenticated/_setupLayout/kpi-setup'
 import { Route as AuthenticatedSetupLayoutEmployeeUploadRouteImport } from './routes/_authenticated/_setupLayout/employee-upload'
 import { Route as AuthenticatedSetupLayoutDriverWeightingsRouteImport } from './routes/_authenticated/_setupLayout/driver-weightings'
+import { Route as AuthenticatedSetupLayoutBonusSetupRouteImport } from './routes/_authenticated/_setupLayout/bonus-setup'
 
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
@@ -147,6 +150,12 @@ const AuthenticatedSetupLayoutRoute =
     id: '/_setupLayout',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSetupLayoutTeamSetupRoute =
+  AuthenticatedSetupLayoutTeamSetupRouteImport.update({
+    id: '/team-setup',
+    path: '/team-setup',
+    getParentRoute: () => AuthenticatedSetupLayoutRoute,
+  } as any)
 const AuthenticatedSetupLayoutRoleAssignmentRoute =
   AuthenticatedSetupLayoutRoleAssignmentRouteImport.update({
     id: '/role-assignment',
@@ -165,6 +174,12 @@ const AuthenticatedSetupLayoutOrgDepartmentsRoute =
     path: '/org-departments',
     getParentRoute: () => AuthenticatedSetupLayoutRoute,
   } as any)
+const AuthenticatedSetupLayoutKpiSetupRoute =
+  AuthenticatedSetupLayoutKpiSetupRouteImport.update({
+    id: '/kpi-setup',
+    path: '/kpi-setup',
+    getParentRoute: () => AuthenticatedSetupLayoutRoute,
+  } as any)
 const AuthenticatedSetupLayoutEmployeeUploadRoute =
   AuthenticatedSetupLayoutEmployeeUploadRouteImport.update({
     id: '/employee-upload',
@@ -175,6 +190,12 @@ const AuthenticatedSetupLayoutDriverWeightingsRoute =
   AuthenticatedSetupLayoutDriverWeightingsRouteImport.update({
     id: '/driver-weightings',
     path: '/driver-weightings',
+    getParentRoute: () => AuthenticatedSetupLayoutRoute,
+  } as any)
+const AuthenticatedSetupLayoutBonusSetupRoute =
+  AuthenticatedSetupLayoutBonusSetupRouteImport.update({
+    id: '/bonus-setup',
+    path: '/bonus-setup',
     getParentRoute: () => AuthenticatedSetupLayoutRoute,
   } as any)
 
@@ -198,11 +219,14 @@ export interface FileRoutesByFullPath {
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/master/new-project': typeof MasterNewProjectRoute
   '/master/': typeof MasterIndexRoute
+  '/bonus-setup': typeof AuthenticatedSetupLayoutBonusSetupRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
+  '/kpi-setup': typeof AuthenticatedSetupLayoutKpiSetupRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
   '/role-assignment': typeof AuthenticatedSetupLayoutRoleAssignmentRoute
+  '/team-setup': typeof AuthenticatedSetupLayoutTeamSetupRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -223,11 +247,14 @@ export interface FileRoutesByTo {
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/master/new-project': typeof MasterNewProjectRoute
   '/master': typeof MasterIndexRoute
+  '/bonus-setup': typeof AuthenticatedSetupLayoutBonusSetupRoute
   '/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
+  '/kpi-setup': typeof AuthenticatedSetupLayoutKpiSetupRoute
   '/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
   '/role-assignment': typeof AuthenticatedSetupLayoutRoleAssignmentRoute
+  '/team-setup': typeof AuthenticatedSetupLayoutTeamSetupRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -252,11 +279,14 @@ export interface FileRoutesById {
   '/_authenticated/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/master/new-project': typeof MasterNewProjectRoute
   '/master/': typeof MasterIndexRoute
+  '/_authenticated/_setupLayout/bonus-setup': typeof AuthenticatedSetupLayoutBonusSetupRoute
   '/_authenticated/_setupLayout/driver-weightings': typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   '/_authenticated/_setupLayout/employee-upload': typeof AuthenticatedSetupLayoutEmployeeUploadRoute
+  '/_authenticated/_setupLayout/kpi-setup': typeof AuthenticatedSetupLayoutKpiSetupRoute
   '/_authenticated/_setupLayout/org-departments': typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   '/_authenticated/_setupLayout/register-entity': typeof AuthenticatedSetupLayoutRegisterEntityRoute
   '/_authenticated/_setupLayout/role-assignment': typeof AuthenticatedSetupLayoutRoleAssignmentRoute
+  '/_authenticated/_setupLayout/team-setup': typeof AuthenticatedSetupLayoutTeamSetupRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -280,11 +310,14 @@ export interface FileRouteTypes {
     | '/weighting-assignment'
     | '/master/new-project'
     | '/master/'
+    | '/bonus-setup'
     | '/driver-weightings'
     | '/employee-upload'
+    | '/kpi-setup'
     | '/org-departments'
     | '/register-entity'
     | '/role-assignment'
+    | '/team-setup'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -305,11 +338,14 @@ export interface FileRouteTypes {
     | '/weighting-assignment'
     | '/master/new-project'
     | '/master'
+    | '/bonus-setup'
     | '/driver-weightings'
     | '/employee-upload'
+    | '/kpi-setup'
     | '/org-departments'
     | '/register-entity'
     | '/role-assignment'
+    | '/team-setup'
   id:
     | '__root__'
     | '/'
@@ -333,11 +369,14 @@ export interface FileRouteTypes {
     | '/_authenticated/weighting-assignment'
     | '/master/new-project'
     | '/master/'
+    | '/_authenticated/_setupLayout/bonus-setup'
     | '/_authenticated/_setupLayout/driver-weightings'
     | '/_authenticated/_setupLayout/employee-upload'
+    | '/_authenticated/_setupLayout/kpi-setup'
     | '/_authenticated/_setupLayout/org-departments'
     | '/_authenticated/_setupLayout/register-entity'
     | '/_authenticated/_setupLayout/role-assignment'
+    | '/_authenticated/_setupLayout/team-setup'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -500,6 +539,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupLayoutRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/_setupLayout/team-setup': {
+      id: '/_authenticated/_setupLayout/team-setup'
+      path: '/team-setup'
+      fullPath: '/team-setup'
+      preLoaderRoute: typeof AuthenticatedSetupLayoutTeamSetupRouteImport
+      parentRoute: typeof AuthenticatedSetupLayoutRoute
+    }
     '/_authenticated/_setupLayout/role-assignment': {
       id: '/_authenticated/_setupLayout/role-assignment'
       path: '/role-assignment'
@@ -521,6 +567,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupLayoutOrgDepartmentsRouteImport
       parentRoute: typeof AuthenticatedSetupLayoutRoute
     }
+    '/_authenticated/_setupLayout/kpi-setup': {
+      id: '/_authenticated/_setupLayout/kpi-setup'
+      path: '/kpi-setup'
+      fullPath: '/kpi-setup'
+      preLoaderRoute: typeof AuthenticatedSetupLayoutKpiSetupRouteImport
+      parentRoute: typeof AuthenticatedSetupLayoutRoute
+    }
     '/_authenticated/_setupLayout/employee-upload': {
       id: '/_authenticated/_setupLayout/employee-upload'
       path: '/employee-upload'
@@ -535,29 +588,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSetupLayoutDriverWeightingsRouteImport
       parentRoute: typeof AuthenticatedSetupLayoutRoute
     }
+    '/_authenticated/_setupLayout/bonus-setup': {
+      id: '/_authenticated/_setupLayout/bonus-setup'
+      path: '/bonus-setup'
+      fullPath: '/bonus-setup'
+      preLoaderRoute: typeof AuthenticatedSetupLayoutBonusSetupRouteImport
+      parentRoute: typeof AuthenticatedSetupLayoutRoute
+    }
   }
 }
 
 interface AuthenticatedSetupLayoutRouteChildren {
+  AuthenticatedSetupLayoutBonusSetupRoute: typeof AuthenticatedSetupLayoutBonusSetupRoute
   AuthenticatedSetupLayoutDriverWeightingsRoute: typeof AuthenticatedSetupLayoutDriverWeightingsRoute
   AuthenticatedSetupLayoutEmployeeUploadRoute: typeof AuthenticatedSetupLayoutEmployeeUploadRoute
+  AuthenticatedSetupLayoutKpiSetupRoute: typeof AuthenticatedSetupLayoutKpiSetupRoute
   AuthenticatedSetupLayoutOrgDepartmentsRoute: typeof AuthenticatedSetupLayoutOrgDepartmentsRoute
   AuthenticatedSetupLayoutRegisterEntityRoute: typeof AuthenticatedSetupLayoutRegisterEntityRoute
   AuthenticatedSetupLayoutRoleAssignmentRoute: typeof AuthenticatedSetupLayoutRoleAssignmentRoute
+  AuthenticatedSetupLayoutTeamSetupRoute: typeof AuthenticatedSetupLayoutTeamSetupRoute
 }
 
 const AuthenticatedSetupLayoutRouteChildren: AuthenticatedSetupLayoutRouteChildren =
   {
+    AuthenticatedSetupLayoutBonusSetupRoute:
+      AuthenticatedSetupLayoutBonusSetupRoute,
     AuthenticatedSetupLayoutDriverWeightingsRoute:
       AuthenticatedSetupLayoutDriverWeightingsRoute,
     AuthenticatedSetupLayoutEmployeeUploadRoute:
       AuthenticatedSetupLayoutEmployeeUploadRoute,
+    AuthenticatedSetupLayoutKpiSetupRoute:
+      AuthenticatedSetupLayoutKpiSetupRoute,
     AuthenticatedSetupLayoutOrgDepartmentsRoute:
       AuthenticatedSetupLayoutOrgDepartmentsRoute,
     AuthenticatedSetupLayoutRegisterEntityRoute:
       AuthenticatedSetupLayoutRegisterEntityRoute,
     AuthenticatedSetupLayoutRoleAssignmentRoute:
       AuthenticatedSetupLayoutRoleAssignmentRoute,
+    AuthenticatedSetupLayoutTeamSetupRoute:
+      AuthenticatedSetupLayoutTeamSetupRoute,
   }
 
 const AuthenticatedSetupLayoutRouteWithChildren =

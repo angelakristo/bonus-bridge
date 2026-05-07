@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+﻿import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { Eye, Loader2, Plus, Send } from "lucide-react";
 import { toast } from "sonner";
@@ -167,7 +167,7 @@ function IndividualKpiProposalPage() {
       </div>
 
       <Card>
-        <CardHeader className="pb-3">
+        <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">
               Individual KPIs ({rows.length})
@@ -196,11 +196,11 @@ function IndividualKpiProposalPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
+            <div className="flex items-center justify-center py-6">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : rows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
+            <p className="py-4 text-center text-sm text-muted-foreground">
               No KPIs proposed yet. Click <span className="font-medium">Propose KPI</span> to add one.
             </p>
           ) : (

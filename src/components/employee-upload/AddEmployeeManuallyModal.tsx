@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Loader2 } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client";
-import { commitEmployeeUpload } from "@/integrations/supabase/employee-upload.functions";
+import { supabase } from "@/integrations/supabase/client"; // used for dept/function dropdowns
+import { createEmployeeManually } from "@/integrations/supabase/create-employee.functions";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -16,6 +17,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -26,11 +28,20 @@ import {
 
 type Role = "ceo" | "manager" | "hr_rep" | "employee";
 
+const ALL_ROLES: { value: Role; label: string }[] = [
+  { value: "employee", label: "Employee" },
+  { value: "manager", label: "Manager" },
+  { value: "hr_rep", label: "HR Rep" },
+  { value: "ceo", label: "CEO" },
+];
+
+type OrgDept = { id: string; name: string };
+type FuncDept = { id: string; name: string };
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entityId: string;
-  uploaderPersonId: string;
   onCreated?: () => void;
 };
 
@@ -38,109 +49,130 @@ const EMPTY = {
   first_name: "",
   last_name: "",
   email: "",
-  org_department: "",
+  position: "",
+  org_department_id: "",
   annual_salary: "",
   employment_start_date: "",
-  role: "employee" as Role,
+  roles: ["employee"] as Role[],
+  functional_department_ids: [] as string[],
 };
 
 export function AddEmployeeManuallyModal({
   open,
   onOpenChange,
   entityId,
-  uploaderPersonId,
   onCreated,
 }: Props) {
-  const commitFn = useServerFn(commitEmployeeUpload);
+  const createFn = useServerFn(createEmployeeManually);
   const [form, setForm] = useState(EMPTY);
-  const [orgDepts, setOrgDepts] = useState<{ id: string; name: string }[]>([]);
+  const [orgDepts, setOrgDepts] = useState<OrgDept[]>([]);
+  const [availableFuncDepts, setAvailableFuncDepts] = useState<FuncDept[]>([]);
+  const [allFuncDepts, setAllFuncDepts] = useState<FuncDept[]>([]);
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     if (!open || !entityId) return;
     setForm(EMPTY);
-    supabase
-      .from("organisational_departments")
-      .select("id, name")
-      .eq("entity_id", entityId)
-      .order("name")
-      .then(({ data, error }) => {
-        if (error) {
-          toast.error(`Failed to load departments: ${error.message}`);
-          return;
-        }
-        setOrgDepts(data ?? []);
-      });
+
+    const loadDepts = async () => {
+      const [orgRes, funcRes] = await Promise.all([
+        supabase
+          .from("organisational_departments")
+          .select("id, name")
+          .eq("entity_id", entityId)
+          .order("name"),
+        supabase
+          .from("functions")
+          .select("id, name")
+          .order("name"),
+      ]);
+      if (orgRes.error) toast.error(`Failed to load departments: ${orgRes.error.message}`);
+      else setOrgDepts(orgRes.data ?? []);
+      if (funcRes.error) toast.error(`Failed to load functions: ${funcRes.error.message}`);
+      else setAllFuncDepts(funcRes.data ?? []);
+    };
+    void loadDepts();
   }, [open, entityId]);
 
-  const update = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) =>
-    setForm((f) => ({ ...f, [key]: value }));
+  // Update available functional depts when org dept changes
+  useEffect(() => {
+    if (!form.org_department_id || !entityId) {
+      setAvailableFuncDepts([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(`bb_dept_setup_${entityId}`);
+      if (!raw) {
+        setAvailableFuncDepts(allFuncDepts);
+        return;
+      }
+      const stored = JSON.parse(raw) as { assignments: Record<string, string[]> };
+      const assignedIds = stored.assignments[form.org_department_id] ?? [];
+      if (assignedIds.length === 0) {
+        setAvailableFuncDepts([]);
+        return;
+      }
+      setAvailableFuncDepts(allFuncDepts.filter((fd) => assignedIds.includes(fd.id)));
+    } catch {
+      setAvailableFuncDepts(allFuncDepts);
+    }
+  }, [form.org_department_id, allFuncDepts, entityId]);
+
+  const toggleRole = (role: Role, checked: boolean) => {
+    setForm((f) => ({
+      ...f,
+      roles: checked ? [...f.roles, role] : f.roles.filter((r) => r !== role),
+    }));
+  };
+
+  const toggleFuncDept = (id: string) => {
+    setForm((f) => ({
+      ...f,
+      functional_department_ids: f.functional_department_ids.includes(id)
+        ? f.functional_department_ids.filter((x) => x !== id)
+        : [...f.functional_department_ids, id],
+    }));
+  };
 
   const handleSubmit = async () => {
-    // Client-side validation
     if (!form.first_name.trim()) return toast.error("First name is required.");
     if (!form.last_name.trim()) return toast.error("Last name is required.");
     if (!form.email.trim() || !/^\S+@\S+\.\S+$/.test(form.email))
       return toast.error("Valid email is required.");
-    if (!form.org_department) return toast.error("Org department is required.");
+    if (!form.org_department_id) return toast.error("Department is required.");
+    if (form.roles.length === 0) return toast.error("At least one role is required.");
     if (form.annual_salary && !Number.isFinite(Number(form.annual_salary)))
       return toast.error("Salary must be a number.");
-    if (
-      form.employment_start_date &&
-      !/^\d{4}-\d{2}-\d{2}$/.test(form.employment_start_date)
-    )
+    if (form.employment_start_date && !/^\d{4}-\d{2}-\d{2}$/.test(form.employment_start_date))
       return toast.error("Date must be YYYY-MM-DD.");
 
     setSubmitting(true);
     try {
-      const result = await commitFn({
+      const result = await createFn({
         data: {
           entity_id: entityId,
-          uploaded_by_person_id: uploaderPersonId,
-          file_name: "manual_entry",
-          rows: [
-            {
-              first_name: form.first_name.trim(),
-              last_name: form.last_name.trim(),
-              email: form.email.trim().toLowerCase(),
-              annual_salary: form.annual_salary.trim(),
-              employment_start_date: form.employment_start_date.trim(),
-              role: form.role,
-              org_department: form.org_department,
-            },
-          ],
+          first_name: form.first_name.trim(),
+          last_name: form.last_name.trim(),
+          email: form.email.trim().toLowerCase(),
+          position: form.position.trim() || null,
+          annual_salary: form.annual_salary ? Number(form.annual_salary) : null,
+          employment_start_date: form.employment_start_date || null,
+          roles: form.roles,
+          org_department_id: form.org_department_id,
+          functional_department_ids: form.functional_department_ids,
         },
       });
 
-      if (result?.partialError) {
-        toast.error(result.partialError);
-        return;
-      }
-      if ((result?.inserted ?? 0) === 0) {
-        toast.error("Employee was not created.");
+      if (!result?.ok) {
+        toast.error(result?.error || "Employee creation failed. Please restart the dev server and try again.");
         return;
       }
 
       toast.success(`${form.first_name} ${form.last_name} added.`);
-      const inviteFailed = (result?.inviteFailures ?? []).length > 0;
-      if (inviteFailed) toast.warning("Invite email failed to send.");
-
       onCreated?.();
       onOpenChange(false);
     } catch (err) {
-      let detail = "";
-      if (err instanceof Response) {
-        try {
-          detail = await err.text();
-        } catch {
-          detail = `HTTP ${err.status}`;
-        }
-      } else if (err instanceof Error) {
-        detail = err.message;
-      } else {
-        detail = String(err);
-      }
-      toast.error(`Failed to add employee: ${detail || "unknown error"}`);
+      toast.error(`Failed to add employee: ${err instanceof Error ? err.message : "unknown error"}`);
     } finally {
       setSubmitting(false);
     }
@@ -148,7 +180,7 @@ export function AddEmployeeManuallyModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Employee Manually</DialogTitle>
           <DialogDescription>
@@ -157,13 +189,14 @@ export function AddEmployeeManuallyModal({
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
+          {/* Name row */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="first_name">First name *</Label>
               <Input
                 id="first_name"
                 value={form.first_name}
-                onChange={(e) => update("first_name", e.target.value)}
+                onChange={(e) => setForm((f) => ({ ...f, first_name: e.target.value }))}
               />
             </div>
             <div className="space-y-1.5">
@@ -171,26 +204,41 @@ export function AddEmployeeManuallyModal({
               <Input
                 id="last_name"
                 value={form.last_name}
-                onChange={(e) => update("last_name", e.target.value)}
+                onChange={(e) => setForm((f) => ({ ...f, last_name: e.target.value }))}
               />
             </div>
           </div>
 
+          {/* Email */}
           <div className="space-y-1.5">
             <Label htmlFor="email">Email *</Label>
             <Input
               id="email"
               type="email"
               value={form.email}
-              onChange={(e) => update("email", e.target.value)}
+              onChange={(e) => setForm((f) => ({ ...f, email: e.target.value }))}
             />
           </div>
 
+          {/* Position */}
           <div className="space-y-1.5">
-            <Label htmlFor="org_department">Org department *</Label>
+            <Label htmlFor="position">Position</Label>
+            <Input
+              id="position"
+              value={form.position}
+              onChange={(e) => setForm((f) => ({ ...f, position: e.target.value }))}
+              placeholder="e.g. Senior Account Manager"
+            />
+          </div>
+
+          {/* Org Department */}
+          <div className="space-y-1.5">
+            <Label htmlFor="org_department">Department *</Label>
             <Select
-              value={form.org_department}
-              onValueChange={(v) => update("org_department", v)}
+              value={form.org_department_id}
+              onValueChange={(v) =>
+                setForm((f) => ({ ...f, org_department_id: v, functional_department_ids: [] }))
+              }
             >
               <SelectTrigger id="org_department">
                 <SelectValue placeholder="Select a department" />
@@ -202,7 +250,7 @@ export function AddEmployeeManuallyModal({
                   </div>
                 ) : (
                   orgDepts.map((d) => (
-                    <SelectItem key={d.id} value={d.name}>
+                    <SelectItem key={d.id} value={d.id}>
                       {d.name}
                     </SelectItem>
                   ))
@@ -211,21 +259,73 @@ export function AddEmployeeManuallyModal({
             </Select>
           </div>
 
+          {/* Functional Departments */}
+          {form.org_department_id && (
+            <div className="space-y-1.5">
+              <Label>Functions</Label>
+              {availableFuncDepts.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No functions assigned to this department yet.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-2 rounded-md border p-2">
+                  {availableFuncDepts.map((fd) => {
+                    const checked = form.functional_department_ids.includes(fd.id);
+                    return (
+                      <label
+                        key={fd.id}
+                        className="flex cursor-pointer items-center gap-1.5 text-sm"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => toggleFuncDept(fd.id)}
+                        />
+                        {fd.name}
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {form.functional_department_ids.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {form.functional_department_ids.map((id) => {
+                    const name = allFuncDepts.find((f) => f.id === id)?.name ?? id;
+                    return (
+                      <Badge key={id} variant="secondary" className="gap-1 text-xs">
+                        {name}
+                        <button
+                          type="button"
+                          onClick={() => toggleFuncDept(id)}
+                          className="ml-0.5 rounded hover:bg-muted"
+                        >
+                          <X className="h-2.5 w-2.5" />
+                        </button>
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Roles */}
           <div className="space-y-1.5">
-            <Label htmlFor="role">Role *</Label>
-            <Select value={form.role} onValueChange={(v) => update("role", v as Role)}>
-              <SelectTrigger id="role">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="employee">Employee</SelectItem>
-                <SelectItem value="manager">Manager</SelectItem>
-                <SelectItem value="hr_rep">HR Rep</SelectItem>
-                <SelectItem value="ceo">CEO</SelectItem>
-              </SelectContent>
-            </Select>
+            <Label>Roles *</Label>
+            <div className="flex flex-wrap gap-4 rounded-md border p-3">
+              {ALL_ROLES.map(({ value, label }) => (
+                <label key={value} className="flex cursor-pointer items-center gap-2 text-sm">
+                  <Checkbox
+                    checked={form.roles.includes(value)}
+                    onCheckedChange={(c) => toggleRole(value, c === true)}
+                    disabled={submitting}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
           </div>
 
+          {/* Salary + Start date */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="annual_salary">Annual salary</Label>
@@ -233,7 +333,7 @@ export function AddEmployeeManuallyModal({
                 id="annual_salary"
                 inputMode="decimal"
                 value={form.annual_salary}
-                onChange={(e) => update("annual_salary", e.target.value)}
+                onChange={(e) => setForm((f) => ({ ...f, annual_salary: e.target.value }))}
                 placeholder="75000"
               />
             </div>
@@ -243,22 +343,18 @@ export function AddEmployeeManuallyModal({
                 id="employment_start_date"
                 placeholder="YYYY-MM-DD"
                 value={form.employment_start_date}
-                onChange={(e) => update("employment_start_date", e.target.value)}
+                onChange={(e) => setForm((f) => ({ ...f, employment_start_date: e.target.value }))}
               />
             </div>
           </div>
         </div>
 
         <DialogFooter>
-          <Button
-            variant="outline"
-            onClick={() => onOpenChange(false)}
-            disabled={submitting}
-          >
+          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={submitting}>
             Cancel
           </Button>
           <Button onClick={handleSubmit} disabled={submitting}>
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Add Employee
           </Button>
         </DialogFooter>

@@ -34,9 +34,9 @@ function MasterLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
       {/* Top bar */}
-      <header className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur">
+      <header className="shrink-0 border-b bg-card/95 backdrop-blur">
         <div className="flex h-14 items-center justify-between px-6">
           <div className="flex items-center gap-3">
             <img src={bonusbridgeFull} alt="BonusBridge" className="h-7 w-auto" />
@@ -65,8 +65,10 @@ function MasterLayout() {
       </header>
 
       {/* Page content */}
-      <main className="mx-auto max-w-6xl px-6 py-8">
-        <Outlet />
+      <main className="flex-1 overflow-y-auto">
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

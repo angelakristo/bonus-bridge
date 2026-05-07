@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { LogOut, Zap, ChevronDown, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { LogOut, Zap, ChevronDown, Loader2, Sun, Moon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 
@@ -47,6 +47,11 @@ export function TopNav({ notificationCount = 0 }: TopNavProps) {
   const { selected_year, setSelectedYear } = useYear();
   const navigate = useNavigate();
   const [switchingTo, setSwitchingTo] = useState<UserRole | null>(null);
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", isDark);
+  }, [isDark]);
 
   const currentYear = new Date().getFullYear();
   const years = [currentYear - 2, currentYear - 1, currentYear, currentYear + 1];
@@ -156,6 +161,15 @@ export function TopNav({ notificationCount = 0 }: TopNavProps) {
         </DropdownMenu>
 
         <ActionCentre />
+
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsDark((d) => !d)}
+          aria-label="Toggle theme"
+        >
+          {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </Button>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

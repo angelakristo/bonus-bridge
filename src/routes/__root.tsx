@@ -5,6 +5,7 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { EntityProvider } from "@/contexts/EntityContext";
 import { YearProvider } from "@/contexts/YearContext";
 import { MasterAuthProvider } from "@/contexts/MasterAuthContext";
+import { SetupProvider } from "@/contexts/SetupContext";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -74,10 +75,12 @@ function RootComponent() {
     <MasterAuthProvider>
       <AuthProvider>
         <EntityProvider>
-          <YearProvider>
-            <Outlet />
-            <Toaster />
-          </YearProvider>
+          <SetupProvider>
+            <YearProvider>
+              <Outlet />
+              <Toaster />
+            </YearProvider>
+          </SetupProvider>
         </EntityProvider>
       </AuthProvider>
     </MasterAuthProvider>

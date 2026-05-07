@@ -79,7 +79,7 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
     if (delFuncRes.error) {
       return {
         ok: false,
-        error: `Failed to clear functional department: ${delFuncRes.error.message}`,
+        error: `Failed to clear function: ${delFuncRes.error.message}`,
       };
     }
 
@@ -90,7 +90,7 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
       if (insFuncRes.error) {
         return {
           ok: false,
-          error: `Failed to set functional department: ${insFuncRes.error.message}`,
+          error: `Failed to set function: ${insFuncRes.error.message}`,
         };
       }
     }

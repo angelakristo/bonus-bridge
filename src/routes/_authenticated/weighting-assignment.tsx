@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Loader2, Save } from "lucide-react";
 import { toast } from "sonner";
@@ -557,7 +557,7 @@ function WeightingAssignmentPage() {
       {selectedPersonId && (
         <>
           {loading ? (
-            <div className="flex items-center justify-center py-10">
+            <div className="flex items-center justify-center py-5">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
@@ -569,7 +569,7 @@ function WeightingAssignmentPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     <div>
                       <Label className="text-sm">Corporate KPIs %</Label>
                       <div className="mt-1">

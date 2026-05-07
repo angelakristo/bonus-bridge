@@ -1,6 +1,6 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { TrendingUp, Zap, Heart, Loader2 } from "lucide-react";
+import { TrendingUp, Zap, Heart, Loader2, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -45,6 +45,7 @@ function DriverWeightingsPage() {
   const { roles } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
   const { selected_year } = useYear();
+  const navigate = useNavigate();
   const allowed = roles.includes("ceo");
 
   const [values, setValues] = useState<Record<DriverKey, number>>({
@@ -54,7 +55,29 @@ function DriverWeightingsPage() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
   const [existingId, setExistingId] = useState<string | null>(null);
+
+  const handleProceed = async () => {
+    if (!entity_id) return;
+    if (!existingId) {
+      toast.error("Save your driver weightings before proceeding.");
+      return;
+    }
+    setProceeding(true);
+    try {
+      const { error } = await supabase.from("setup_progress").upsert(
+        { entity_id, step_key: "set_driver_weightings", status: "complete", updated_at: new Date().toISOString() },
+        { onConflict: "entity_id,step_key" },
+      );
+      if (error) throw error;
+      navigate({ to: "/kpi-board" });
+    } catch {
+      toast.error("Failed to proceed. Please try again.");
+    } finally {
+      setProceeding(false);
+    }
+  };
 
   useEffect(() => {
     if (!allowed || !entity_id) {
@@ -220,12 +243,13 @@ function DriverWeightingsPage() {
             </p>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex items-center justify-end gap-3">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span tabIndex={isValid ? -1 : 0}>
                     <Button
+                      variant="outline"
                       onClick={handleSave}
                       disabled={!isValid || saving}
                     >
@@ -245,6 +269,10 @@ function DriverWeightingsPage() {
                 )}
               </Tooltip>
             </TooltipProvider>
+            <Button onClick={handleProceed} disabled={proceeding || !entity_id}>
+              {proceeding ? "Saving..." : "Proceed to KPI Board"}
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
           </div>
         </>
       )}

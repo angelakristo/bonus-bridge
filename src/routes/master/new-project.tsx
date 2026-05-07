@@ -21,6 +21,7 @@ import {
   type CreateProjectResult,
 } from "@/integrations/supabase/master.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { useMasterAuth } from "@/contexts/MasterAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,6 +55,7 @@ const EMPTY_USER = (): UserDraft => ({
 function NewProjectPage() {
   const createFn = useServerFn(masterCreateProject);
   const navigate = useNavigate();
+  const { masterSignOut } = useMasterAuth();
 
   // Form state
   const [companyName, setCompanyName] = useState("");
@@ -127,11 +129,12 @@ function NewProjectPage() {
   const handleOpenProject = async (email: string) => {
     if (!openPassword) { toast.error("Enter the password to open the project."); return; }
     setSigningIn(true);
+    masterSignOut();
     const { error } = await supabase.auth.signInWithPassword({ email, password: openPassword });
     setSigningIn(false);
     if (error) { toast.error(`Sign in failed: ${error.message}`); return; }
     toast.success(`Signed in as ${email}`);
-    navigate({ to: "/dashboard", replace: true });
+    navigate({ to: "/setup", replace: true });
   };
 
   // ── Success view ────────────────────────────────────────────────────────────
@@ -424,19 +427,14 @@ function NewProjectPage() {
       </Card>
 
       {/* Submit */}
-      <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3">
-        <p className="text-sm text-muted-foreground">
-          This will create the company, a root org department ("HQ Corporate"), and the specified admin accounts.
-        </p>
-        <div className="flex gap-3 shrink-0 ml-4">
-          <Button asChild variant="outline" disabled={submitting}>
-            <Link to="/master">Cancel</Link>
-          </Button>
-          <Button onClick={() => void handleSubmit()} disabled={submitting}>
-            {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
-            Create Project
-          </Button>
-        </div>
+      <div className="flex justify-end gap-3 pt-2">
+        <Button asChild variant="outline" disabled={submitting}>
+          <Link to="/master">Cancel</Link>
+        </Button>
+        <Button onClick={() => void handleSubmit()} disabled={submitting}>
+          {submitting && <Loader2 className="h-4 w-4 animate-spin" />}
+          Create Project
+        </Button>
       </div>
     </div>
   );

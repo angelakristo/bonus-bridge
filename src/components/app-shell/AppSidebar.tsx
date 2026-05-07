@@ -17,6 +17,7 @@ import {
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
+import { useSetupStatus } from "@/contexts/SetupContext";
 import type { Database } from "@/integrations/supabase/types";
 import {
   Sidebar,
@@ -55,7 +56,7 @@ const FLAT_NAV_ITEMS: NavItem[] = [
   { title: "Weightings",        url: "/weighting-assignment",  icon: Scale,       roles: ["manager"] },
   { title: "Bonus Assignments", url: "/bonus-assignments",    icon: Wallet,      roles: ["manager"] },
   { title: "Setup",             url: "/setup",                icon: Settings,    roles: ["hr_rep"] },
-  { title: "Upload Employees",  url: "/employee-upload",      icon: Upload,      roles: ["hr_rep"] },
+  { title: "Team Setup",         url: "/team-setup",           icon: Upload,      roles: ["hr_rep"] },
   { title: "Upload Actuals",    url: "/actuals-upload",       icon: Upload,      roles: ["hr_rep"] },
   { title: "Upload History",    url: "/upload-history",       icon: History,     roles: ["hr_rep"] },
 ];
@@ -90,7 +91,7 @@ const CEO_GROUPS: NavGroup[] = [
     title: "Uploads",
     icon: Upload,
     items: [
-      { title: "Upload Employees", url: "/employee-upload" },
+      { title: "Team Setup",        url: "/team-setup" },
       { title: "Upload Actuals",   url: "/actuals-upload" },
       { title: "Upload History",   url: "/upload-history" },
     ],
@@ -104,6 +105,7 @@ function hasAnyRole(userRoles: UserRole[], allowed: UserRole[]) {
 export function AppSidebar() {
   const { roles, person } = useAuth();
   const { entity_id } = useEntity();
+  const { isSetupComplete, loading: setupLoading } = useSetupStatus();
   const location = useLocation();
 
   const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
@@ -112,6 +114,9 @@ export function AppSidebar() {
   const isCeo = roles.includes("ceo");
   const isHrRep = roles.includes("hr_rep");
   const showActionButtons = isCeo || isHrRep;
+
+  // Lock all non-Setup nav items until setup is complete (CEO / HR Rep only)
+  const isLocked = (isCeo || isHrRep) && !isSetupComplete && !setupLoading;
 
   // For CEO, track which groups are open (default all open)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
@@ -131,7 +136,8 @@ export function AppSidebar() {
   return (
     <>
       <Sidebar collapsible="icon">
-        {showActionButtons && (
+        {/* Action buttons — hidden while setup is locked */}
+        {showActionButtons && !isLocked && (
           <SidebarHeader className="border-b p-3 gap-2 group-data-[collapsible=icon]:hidden">
             <Button
               size="sm"
@@ -155,38 +161,53 @@ export function AppSidebar() {
 
         <SidebarContent>
           {isCeo ? (
-            // CEO: My Dashboard (flat) + grouped sections + Setup (flat)
+            // CEO: My Dashboard (flat) + grouped sections + Setup (flat, hidden post-setup)
             <SidebarGroup>
               <SidebarGroupLabel>Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {/* My Dashboard */}
                   <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={isActive("/dashboard")} tooltip="My Dashboard">
-                      <Link to="/dashboard">
+                    {isLocked ? (
+                      <SidebarMenuButton
+                        tooltip="My Dashboard"
+                        className="pointer-events-none opacity-40 cursor-not-allowed"
+                        aria-disabled
+                      >
                         <Home className="h-4 w-4" />
                         <span>My Dashboard</span>
-                      </Link>
-                    </SidebarMenuButton>
+                      </SidebarMenuButton>
+                    ) : (
+                      <SidebarMenuButton asChild isActive={isActive("/dashboard")} tooltip="My Dashboard">
+                        <Link to="/dashboard">
+                          <Home className="h-4 w-4" />
+                          <span>My Dashboard</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    )}
                   </SidebarMenuItem>
 
                   {/* Collapsible groups */}
                   {CEO_GROUPS.map((group) => (
                     <Collapsible
                       key={group.title}
-                      open={openGroups[group.title]}
-                      onOpenChange={() => toggleGroup(group.title)}
+                      open={isLocked ? false : openGroups[group.title]}
+                      onOpenChange={() => { if (!isLocked) toggleGroup(group.title); }}
                       className="group/collapsible"
                     >
                       <SidebarMenuItem>
                         <CollapsibleTrigger asChild>
                           <SidebarMenuButton
                             tooltip={group.title}
-                            isActive={!openGroups[group.title] && groupIsActive(group)}
+                            isActive={!isLocked && !openGroups[group.title] && groupIsActive(group)}
+                            className={isLocked ? "pointer-events-none opacity-40 cursor-not-allowed" : ""}
+                            aria-disabled={isLocked}
                           >
                             <group.icon className="h-4 w-4" />
                             <span>{group.title}</span>
-                            <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                            {!isLocked && (
+                              <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                            )}
                           </SidebarMenuButton>
                         </CollapsibleTrigger>
                         <CollapsibleContent>
@@ -204,15 +225,17 @@ export function AppSidebar() {
                     </Collapsible>
                   ))}
 
-                  {/* Setup */}
-                  <SidebarMenuItem>
-                    <SidebarMenuButton asChild isActive={isActive("/setup")} tooltip="Setup">
-                      <Link to="/setup">
-                        <Settings className="h-4 w-4" />
-                        <span>Setup</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
+                  {/* Setup — shown only while setup is incomplete */}
+                  {!isSetupComplete && (
+                    <SidebarMenuItem>
+                      <SidebarMenuButton asChild isActive={isActive("/setup")} tooltip="Setup">
+                        <Link to="/setup">
+                          <Settings className="h-4 w-4" />
+                          <span>Setup</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  )}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -222,16 +245,35 @@ export function AppSidebar() {
               <SidebarGroupLabel>Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {FLAT_NAV_ITEMS.filter((item) => hasAnyRole(roles, item.roles)).map((item) => (
-                    <SidebarMenuItem key={item.url}>
-                      <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
-                        <Link to={item.url}>
-                          <item.icon className="h-4 w-4" />
-                          <span>{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    </SidebarMenuItem>
-                  ))}
+                  {FLAT_NAV_ITEMS
+                    .filter((item) => hasAnyRole(roles, item.roles))
+                    // Hide Setup once setup is complete
+                    .filter((item) => !(item.url === "/setup" && isSetupComplete))
+                    .map((item) => {
+                      const isSetupItem = item.url === "/setup";
+                      const disabled = isLocked && !isSetupItem;
+                      return (
+                        <SidebarMenuItem key={item.url}>
+                          {disabled ? (
+                            <SidebarMenuButton
+                              tooltip={item.title}
+                              className="pointer-events-none opacity-40 cursor-not-allowed"
+                              aria-disabled
+                            >
+                              <item.icon className="h-4 w-4" />
+                              <span>{item.title}</span>
+                            </SidebarMenuButton>
+                          ) : (
+                            <SidebarMenuButton asChild isActive={isActive(item.url)} tooltip={item.title}>
+                              <Link to={item.url}>
+                                <item.icon className="h-4 w-4" />
+                                <span>{item.title}</span>
+                              </Link>
+                            </SidebarMenuButton>
+                          )}
+                        </SidebarMenuItem>
+                      );
+                    })}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>
@@ -240,13 +282,12 @@ export function AppSidebar() {
       </Sidebar>
 
       {/* Modals */}
-      {showActionButtons && entity_id && person?.id && (
+      {showActionButtons && !isLocked && entity_id && person?.id && (
         <>
           <AddEmployeeManuallyModal
             open={addEmployeeOpen}
             onOpenChange={setAddEmployeeOpen}
             entityId={entity_id}
-            uploaderPersonId={person.id}
             onCreated={() => setAddEmployeeOpen(false)}
           />
           <AddKpiModal

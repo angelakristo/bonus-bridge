@@ -1,14 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Building2, Users, Plus, ExternalLink, Shield, Loader2, RefreshCw } from "lucide-react";
+import { Building2, Plus, ExternalLink, Shield, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
 import { masterListProjects, type ProjectSummary } from "@/integrations/supabase/master.functions";
 import { supabase } from "@/integrations/supabase/client";
+import { useMasterAuth } from "@/contexts/MasterAuthContext";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -19,6 +18,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export const Route = createFileRoute("/master/")({
   component: MasterProjectsPage,
@@ -37,6 +44,7 @@ const ROLE_LABELS: Record<string, string> = {
 function MasterProjectsPage() {
   const listFn = useServerFn(masterListProjects);
   const navigate = useNavigate();
+  const { masterSignOut } = useMasterAuth();
 
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +75,7 @@ function MasterProjectsPage() {
   const handleSignIn = async () => {
     if (!openDialog) return;
     setSigningIn(true);
+    masterSignOut();
     const { error } = await supabase.auth.signInWithPassword({
       email: openDialog.email,
       password: openPassword,
@@ -78,7 +87,7 @@ function MasterProjectsPage() {
     }
     toast.success(`Signed in as ${openDialog.email}`);
     setOpenDialog(null);
-    navigate({ to: "/dashboard", replace: true });
+    navigate({ to: "/", replace: true });
   };
 
   return (
@@ -123,81 +132,64 @@ function MasterProjectsPage() {
           </Button>
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {projects.map((project) => (
-            <Card key={project.id} className="flex flex-col">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <h2 className="truncate font-semibold">{project.name}</h2>
-                    {project.industry && (
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                        {project.industry}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1 rounded-md bg-muted px-2 py-1">
-                    <Users className="h-3 w-3 text-muted-foreground" />
-                    <span className="text-xs font-medium">{project.total_people}</span>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="flex flex-1 flex-col gap-3 pt-0">
-                {/* Leaders */}
-                <div className="flex-1 space-y-2">
-                  {project.leaders.length === 0 ? (
-                    <p className="text-xs text-muted-foreground italic">No CEO or HR Rep assigned</p>
-                  ) : (
-                    project.leaders.map((leader) => (
-                      <div key={leader.id} className="flex items-center justify-between gap-2">
-                        <div className="min-w-0">
-                          <p className="truncate text-sm font-medium">
-                            {leader.first_name} {leader.last_name}
-                          </p>
-                          <p className="truncate text-xs text-muted-foreground">{leader.email}</p>
-                        </div>
-                        <div className="flex shrink-0 gap-1">
-                          {leader.roles.map((role) => (
-                            <span
-                              key={role}
-                              className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold ${ROLE_COLOURS[role] ?? "bg-muted text-muted-foreground"}`}
-                            >
-                              {ROLE_LABELS[role] ?? role}
+        <div className="rounded-lg border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Project Name</TableHead>
+                <TableHead>Industry</TableHead>
+                <TableHead>Admin Users</TableHead>
+                <TableHead className="text-right">People</TableHead>
+                <TableHead className="text-right">Departments</TableHead>
+                <TableHead className="text-right">KPIs</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {projects.map((project) => (
+                <TableRow key={project.id}>
+                  <TableCell className="font-medium">{project.name}</TableCell>
+                  <TableCell>
+                    {project.industry ?? <span className="text-muted-foreground">—</span>}
+                  </TableCell>
+                  <TableCell>
+                    {project.leaders.length === 0 ? (
+                      <span className="text-xs italic text-muted-foreground">No CEO or HR Rep assigned</span>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {project.leaders.map((leader) => (
+                          <div key={leader.id} className="flex flex-wrap items-center gap-2">
+                            <span className="text-sm font-medium">
+                              {leader.first_name} {leader.last_name}
                             </span>
-                          ))}
-                        </div>
+                            {leader.roles.map((role) => (
+                              <span
+                                key={role}
+                                className={`inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-semibold ${ROLE_COLOURS[role] ?? "bg-muted text-muted-foreground"}`}
+                              >
+                                {ROLE_LABELS[role] ?? role}
+                              </span>
+                            ))}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-6 gap-1 px-2 text-xs"
+                              onClick={() => handleOpenProject(leader.email ?? "", `${leader.first_name} ${leader.last_name}`)}
+                            >
+                              <ExternalLink className="h-3 w-3" />
+                              Open as {leader.first_name}
+                            </Button>
+                          </div>
+                        ))}
                       </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Open buttons — one per leader */}
-                {project.leaders.length > 0 && (
-                  <div className="flex flex-wrap gap-2 border-t pt-3">
-                    {project.leaders.map((leader) => (
-                      <Button
-                        key={leader.id}
-                        size="sm"
-                        variant="outline"
-                        className="gap-1.5 text-xs"
-                        onClick={() => handleOpenProject(leader.email ?? "", `${leader.first_name} ${leader.last_name}`)}
-                      >
-                        <ExternalLink className="h-3 w-3" />
-                        Open as {leader.first_name}
-                      </Button>
-                    ))}
-                  </div>
-                )}
-
-                {project.leaders.length === 0 && (
-                  <p className="text-xs text-muted-foreground">
-                    Create a CEO or HR Rep user to access this project.
-                  </p>
-                )}
-              </CardContent>
-            </Card>
-          ))}
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right">{project.total_people}</TableCell>
+                  <TableCell className="text-right">{project.org_department_count}</TableCell>
+                  <TableCell className="text-right">{project.total_kpi_count}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       )}
 

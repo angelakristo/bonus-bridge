@@ -98,14 +98,16 @@ INSERT INTO public.entities (id, name, industry) VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- =============================================================================
--- 3. FUNCTIONAL DEPARTMENTS
+-- 3. FUNCTIONS (flat list of business functions)
 -- =============================================================================
-INSERT INTO public.functional_departments (name)
+INSERT INTO public.functions (name)
 SELECT v.name FROM (VALUES
-  ('Sales'), ('Finance'), ('Product'), ('Operations'), ('Human Resources')
+  ('Sales'), ('Finance'), ('Accounting'), ('Marketing'), ('Product'), ('Operations'),
+  ('Human Resources'), ('Risk'), ('Compliance'), ('Legal'), ('Technology'),
+  ('Executive'), ('Other')
 ) AS v(name)
 WHERE NOT EXISTS (
-  SELECT 1 FROM public.functional_departments fd WHERE fd.name = v.name
+  SELECT 1 FROM public.functions f WHERE f.name = v.name
 );
 
 -- =============================================================================
@@ -194,25 +196,25 @@ INSERT INTO public.people_org_departments (person_id, org_department_id) VALUES
 ON CONFLICT DO NOTHING;
 
 -- =============================================================================
--- 8. FUNCTIONAL DEPARTMENT MEMBERSHIPS
+-- 8. FUNCTION MEMBERSHIPS
 -- =============================================================================
 INSERT INTO public.people_functional_departments (person_id, functional_department_id)
-SELECT pairs.pid, fd.id
+SELECT pairs.pid, f.id
 FROM (VALUES
-  ('30000000-0000-0000-0000-000000000001'::uuid, 'Finance'),          -- Sofia → Finance (exec)
+  ('30000000-0000-0000-0000-000000000001'::uuid, 'Accounting'),       -- Sofia → Accounting (exec)
   ('30000000-0000-0000-0000-000000000002'::uuid, 'Human Resources'),  -- Marcus → HR
   ('30000000-0000-0000-0000-000000000003'::uuid, 'Sales'),            -- Priya → Sales
   ('30000000-0000-0000-0000-000000000004'::uuid, 'Sales'),            -- Aisha → Sales
   ('30000000-0000-0000-0000-000000000005'::uuid, 'Sales'),            -- Chloe → Sales
-  ('30000000-0000-0000-0000-000000000006'::uuid, 'Finance'),          -- James → Finance
+  ('30000000-0000-0000-0000-000000000006'::uuid, 'Accounting'),       -- James → Accounting
   ('30000000-0000-0000-0000-000000000007'::uuid, 'Product'),          -- Elena → Product
   ('30000000-0000-0000-0000-000000000008'::uuid, 'Operations'),       -- Tom → Operations
   ('30000000-0000-0000-0000-000000000009'::uuid, 'Sales'),            -- Sarah → Sales
   ('30000000-0000-0000-0000-000000000010'::uuid, 'Sales'),            -- David → Sales
   ('30000000-0000-0000-0000-000000000011'::uuid, 'Product'),          -- Anna → Product
   ('30000000-0000-0000-0000-000000000012'::uuid, 'Operations')        -- Ryan → Operations
-) AS pairs(pid, dept_name)
-JOIN public.functional_departments fd ON fd.name = pairs.dept_name
+) AS pairs(pid, func_name)
+JOIN public.functions f ON f.name = pairs.func_name
 ON CONFLICT DO NOTHING;
 
 -- =============================================================================
@@ -836,15 +838,15 @@ ON CONFLICT DO NOTHING;
 -- 24. SETUP PROGRESS (mark all steps complete for Northwind Technologies)
 -- =============================================================================
 INSERT INTO public.setup_progress (entity_id, step_key, status, updated_by) VALUES
-  ('10000000-0000-0000-0000-000000000001','register_entity',    'complete','30000000-0000-0000-0000-000000000002'),
-  ('10000000-0000-0000-0000-000000000001','org_departments',    'complete','30000000-0000-0000-0000-000000000002'),
-  ('10000000-0000-0000-0000-000000000001','employee_upload',    'complete','30000000-0000-0000-0000-000000000002'),
-  ('10000000-0000-0000-0000-000000000001','role_assignment',    'complete','30000000-0000-0000-0000-000000000002'),
-  ('10000000-0000-0000-0000-000000000001','driver_weightings',  'complete','30000000-0000-0000-0000-000000000001'),
-  ('10000000-0000-0000-0000-000000000001','corporate_kpis',     'complete','30000000-0000-0000-0000-000000000001'),
-  ('10000000-0000-0000-0000-000000000001','kpi_approvals',      'complete','30000000-0000-0000-0000-000000000001'),
-  ('10000000-0000-0000-0000-000000000001','weighting_assignment','complete','30000000-0000-0000-0000-000000000001'),
-  ('10000000-0000-0000-0000-000000000001','bonus_schemes',      'complete','30000000-0000-0000-0000-000000000001')
+  ('10000000-0000-0000-0000-000000000001','register_entity',          'complete','30000000-0000-0000-0000-000000000002'),
+  ('10000000-0000-0000-0000-000000000001','build_org_departments',    'complete','30000000-0000-0000-0000-000000000002'),
+  ('10000000-0000-0000-0000-000000000001','team_setup',               'complete','30000000-0000-0000-0000-000000000002'),
+  ('10000000-0000-0000-0000-000000000001','set_driver_weightings',    'complete','30000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000001','configure_corporate_kpis', 'complete','30000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000001','configure_department_kpis','complete','30000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000001','employee_kpi_proposals',   'complete','30000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000001','assign_weightings',        'complete','30000000-0000-0000-0000-000000000001'),
+  ('10000000-0000-0000-0000-000000000001','assign_bonus_schemes',     'complete','30000000-0000-0000-0000-000000000001')
 ON CONFLICT (entity_id, step_key) DO NOTHING;
 
 -- =============================================================================

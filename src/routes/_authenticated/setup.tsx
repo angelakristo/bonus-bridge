@@ -28,7 +28,7 @@ const ALLOWED_ROLES = ["ceo", "hr_rep"] as const;
 
 function SetupPage() {
   const { roles } = useAuth();
-  const { entity_id } = useEntity();
+  const { entity_id, loading: entityLoading } = useEntity();
   const navigate = useNavigate();
   const [progress, setProgress] = useState<Record<string, SetupStepStatus>>({});
   const [loading, setLoading] = useState(true);
@@ -45,7 +45,7 @@ function SetupPage() {
     const load = async () => {
       setLoading(true);
       const derived: Record<string, SetupStepStatus> = {};
-      derived.register_entity = entity_id ? "complete" : "not_started";
+      derived.register_entity = entityLoading ? "in_progress" : entity_id ? "complete" : "not_started";
 
       if (!entity_id) {
         if (!cancelled) {
@@ -85,6 +85,17 @@ function SetupPage() {
       derived.upload_employees =
         (uploadsRes.count ?? 0) > 0 ? "complete" : derived.upload_employees ?? "not_started";
 
+      // Merge the three KPI sub-steps into one "kpi_setup" status
+      const kpiSubKeys = ["set_driver_weightings", "configure_corporate_kpis", "configure_department_kpis"] as const;
+      const kpiStatuses = kpiSubKeys.map((k) => derived[k] ?? "not_started");
+      if (kpiStatuses.every((s) => s === "complete")) {
+        derived.kpi_setup = "complete";
+      } else if (kpiStatuses.some((s) => s !== "not_started")) {
+        derived.kpi_setup = "in_progress";
+      } else {
+        derived.kpi_setup = "not_started";
+      }
+
       setProgress(derived);
       setLoading(false);
     };
@@ -93,7 +104,7 @@ function SetupPage() {
     return () => {
       cancelled = true;
     };
-  }, [entity_id, allowed]);
+  }, [entity_id, entityLoading, allowed]);
 
   const completedCount = useMemo(
     () => STEPS.filter((s) => progress[s.key] === "complete").length,
@@ -116,7 +127,7 @@ function SetupPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl space-y-4">
+    <div className="mx-auto w-full max-w-3xl space-y-3">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Setup Checklist</h1>
         <p className="text-sm text-muted-foreground">
@@ -129,56 +140,66 @@ function SetupPage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12 text-muted-foreground">
+        <div className="flex items-center justify-center py-6 text-muted-foreground">
           <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Loading…
         </div>
       ) : (
-        <ol className="space-y-2">
-          {STEPS.map((step, idx) => {
-            const status: SetupStepStatus = progress[step.key] ?? "not_started";
-            const meta = STATUS_META[status];
-            const isComplete = status === "complete";
-            return (
-              <li key={step.key}>
-                <Card>
-                  <CardContent className="flex items-center gap-4 p-4">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-muted text-sm font-medium text-muted-foreground">
-                      {isComplete ? (
-                        <CheckCircle2 className="h-5 w-5 text-primary" />
-                      ) : status === "in_progress" ? (
-                        <Circle className="h-5 w-5 text-accent-foreground" />
-                      ) : (
-                        idx + 1
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <h3 className="truncate font-medium text-foreground">{step.title}</h3>
-                        <Badge variant={meta.variant} className={meta.className}>
-                          {meta.label}
-                        </Badge>
+        <>
+          <ol className="space-y-2">
+            {STEPS.map((step, idx) => {
+              const status: SetupStepStatus = progress[step.key] ?? "not_started";
+              const meta = STATUS_META[status];
+              const isComplete = status === "complete";
+              return (
+                <li key={step.key}>
+                  <Card>
+                    <CardContent className="flex items-center gap-3 p-3">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border bg-muted text-sm font-medium text-muted-foreground">
+                        {isComplete ? (
+                          <CheckCircle2 className="h-5 w-5 text-primary" />
+                        ) : status === "in_progress" ? (
+                          <Circle className="h-5 w-5 text-accent-foreground" />
+                        ) : (
+                          idx + 1
+                        )}
                       </div>
-                      <p className="truncate text-sm text-muted-foreground">{step.description}</p>
-                    </div>
-                    <Button
-                      variant={isComplete ? "outline" : "default"}
-                      size="sm"
-                      onClick={() => {
-                        if (step.route) {
-                          navigate({ to: step.route });
-                        } else {
-                          toast("Coming soon", { description: `${step.title} screen is not built yet.` });
-                        }
-                      }}
-                    >
-                      Go <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                    </Button>
-                  </CardContent>
-                </Card>
-              </li>
-            );
-          })}
-        </ol>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                          <h3 className="truncate font-medium text-foreground">{step.title}</h3>
+                          <Badge variant={meta.variant} className={meta.className}>
+                            {meta.label}
+                          </Badge>
+                        </div>
+                        <p className="truncate text-sm text-muted-foreground">{step.description}</p>
+                      </div>
+                      <Button
+                        variant={isComplete ? "outline" : "default"}
+                        size="sm"
+                        onClick={() => {
+                          if (step.route) {
+                            navigate({ to: step.route });
+                          } else {
+                            toast("Coming soon", { description: `${step.title} screen is not built yet.` });
+                          }
+                        }}
+                      >
+                        Go <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </li>
+              );
+            })}
+          </ol>
+
+          {completedCount === STEPS.length && (
+            <div className="flex justify-end pt-2">
+              <Button size="lg" onClick={() => void navigate({ to: "/dashboard" })}>
+                Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

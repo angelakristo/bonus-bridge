@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { Check, Loader2, X } from "lucide-react";
 import { toast } from "sonner";
@@ -224,7 +224,7 @@ function KpiApprovalsPage() {
 
   if (!allowed) {
     return (
-      <div className="p-6 text-sm text-muted-foreground">
+      <div className="p-3 text-sm text-muted-foreground">
         You do not have access to this page.
       </div>
     );
@@ -250,11 +250,11 @@ function KpiApprovalsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex items-center justify-center py-10">
+            <div className="flex items-center justify-center py-5">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : rows.length === 0 ? (
-            <p className="py-8 text-center text-sm text-muted-foreground">
+            <p className="py-4 text-center text-sm text-muted-foreground">
               No KPIs pending your approval.
             </p>
           ) : (

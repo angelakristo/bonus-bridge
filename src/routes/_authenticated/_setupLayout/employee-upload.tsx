@@ -1,8 +1,8 @@
 import { useRef, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import * as XLSX from "xlsx-js-style";
-import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2, UserPlus } from "lucide-react";
+import { Download, Upload as UploadIcon, FileSpreadsheet, Loader2, UserPlus, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,7 +23,7 @@ const HEADERS = [
   "first_name",
   "last_name",
   "email",
-  "org_department",
+  "department",
   "annual_salary",
   "employment_start_date",
   "role",
@@ -35,7 +35,7 @@ const REQUIRED_FIELDS: FieldName[] = [
   "first_name",
   "last_name",
   "email",
-  "org_department",
+  "department",
   "role",
 ];
 
@@ -106,6 +106,7 @@ const FIELD_ORDER: Record<string, number> = HEADERS.reduce(
 function EmployeeUploadPage() {
   const { roles, person } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
+  const navigate = useNavigate();
   const allowed = roles.includes("hr_rep") || roles.includes("ceo");
   const commitFn = useServerFn(commitEmployeeUpload);
 
@@ -116,6 +117,24 @@ function EmployeeUploadPage() {
   const [errors, setErrors] = useState<ValidationError[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
+  const [proceeding, setProceeding] = useState(false);
+
+  const handleProceed = async () => {
+    if (!entity_id) return;
+    setProceeding(true);
+    try {
+      const { error } = await supabase.from("setup_progress").upsert(
+        { entity_id, step_key: "upload_employees", status: "complete", updated_at: new Date().toISOString() },
+        { onConflict: "entity_id,step_key" },
+      );
+      if (error) throw error;
+      navigate({ to: "/role-assignment" });
+    } catch {
+      toast.error("Failed to proceed. Please try again.");
+    } finally {
+      setProceeding(false);
+    }
+  };
 
   if (!allowed) {
     return (
@@ -229,12 +248,12 @@ function EmployeeUploadPage() {
           seenEmails.add(emailKey);
         }
 
-        // 3. Org department
-        if (values.org_department && !orgDeptNames.has(values.org_department)) {
+        // 3. Department
+        if (values.department && !orgDeptNames.has(values.department)) {
           collected.push({
             row,
-            field: "org_department",
-            error: `Org department not found: ${values.org_department}`,
+            field: "department",
+            error: `Department not found: ${values.department}`,
           });
         }
 
@@ -297,7 +316,7 @@ function EmployeeUploadPage() {
           | "manager"
           | "hr_rep"
           | "employee",
-        org_department: values.org_department.trim(),
+        department: values.department.trim(),
       }));
 
       setIsCommitting(true);
@@ -465,13 +484,20 @@ function EmployeeUploadPage() {
         </CardContent>
       </Card>
 
+      {/* Proceed Button */}
+      <div className="flex justify-end pt-2">
+        <Button onClick={handleProceed} disabled={proceeding || !entity_id}>
+          {proceeding ? "Saving..." : "Proceed to Assign Roles"}
+          <ArrowRight className="ml-2 h-4 w-4" />
+        </Button>
+      </div>
+
       <UploadValidationModal open={modalOpen} onOpenChange={setModalOpen} errors={errors} />
       {entity_id && person?.id && (
         <AddEmployeeManuallyModal
           open={manualOpen}
           onOpenChange={setManualOpen}
           entityId={entity_id}
-          uploaderPersonId={person.id}
         />
       )}
     </div>

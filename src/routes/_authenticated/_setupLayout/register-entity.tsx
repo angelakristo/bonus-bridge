@@ -115,6 +115,10 @@ function RegisterEntityPage() {
       }
 
       setEntity(data.id, data.name);
+      await supabase.from("setup_progress").upsert(
+        { entity_id: data.id, step_key: "register_entity", status: "complete", updated_at: new Date().toISOString() },
+        { onConflict: "entity_id,step_key" },
+      );
       logRegisterEntity("/org-departments", `entity updated (${data.id})`);
       toast.success("Company details saved");
       navigate({ to: "/org-departments", replace: true });
@@ -140,6 +144,10 @@ function RegisterEntityPage() {
     }
 
     setEntity(data.id, data.name);
+    await supabase.from("setup_progress").upsert(
+      { entity_id: data.id, step_key: "register_entity", status: "complete", updated_at: new Date().toISOString() },
+      { onConflict: "entity_id,step_key" },
+    );
     logRegisterEntity("/org-departments", `entity created (${data.id})`);
     toast.success("Company registered");
     navigate({ to: "/org-departments", replace: true });
@@ -147,7 +155,7 @@ function RegisterEntityPage() {
 
   const submitLabel = submitting
     ? isExisting ? "Saving..." : "Registering..."
-    : isExisting ? "Continue" : "Register Company";
+    : "Proceed to Department Setup";
 
   return (
     <div className="mx-auto w-full max-w-2xl space-y-4">

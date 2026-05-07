@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -16,7 +16,8 @@ export const Route = createFileRoute("/_authenticated/_setupLayout")({
 
 function SetupLayout() {
   const { roles } = useAuth();
-  const { entity_id } = useEntity();
+  const { entity_id, loading: entityLoading } = useEntity();
+  const location = useLocation();
   const allowed = roles.includes("hr_rep") || roles.includes("ceo");
 
   const [progress, setProgress] = useState<Record<string, SetupStepStatus>>({});
@@ -33,46 +34,49 @@ function SetupLayout() {
     const load = async () => {
       setLoading(true);
 
-      const derived: Record<string, SetupStepStatus> = {};
-      derived.register_entity = entity_id ? "complete" : "not_started";
-
       if (!entity_id) {
         if (!cancelled) {
-          setProgress(derived);
+          const fallback: Record<string, SetupStepStatus> = {
+            register_entity: entityLoading ? "in_progress" : "not_started",
+          };
+          setProgress(fallback);
           setLoading(false);
         }
         return;
       }
 
-      const [progressRes, orgDeptRes, uploadsRes] = await Promise.all([
-        supabase
-          .from("setup_progress")
-          .select("step_key, status")
-          .eq("entity_id", entity_id),
-        supabase
-          .from("organisational_departments")
-          .select("id", { head: true, count: "exact" })
-          .eq("entity_id", entity_id),
-        supabase
-          .from("excel_uploads")
-          .select("id", { head: true, count: "exact" })
-          .eq("entity_id", entity_id)
-          .eq("upload_type", "employees"),
-      ]);
+      const { data, error } = await supabase
+        .from("setup_progress")
+        .select("step_key, status")
+        .eq("entity_id", entity_id);
 
       if (cancelled) return;
 
-      // Fallback from setup_progress table for keys without derivation
-      (progressRes.data ?? []).forEach((row) => {
+      if (error) {
+        console.error("[SetupLayout] failed to load progress", error);
+        setProgress({});
+        setLoading(false);
+        return;
+      }
+
+      const derived: Record<string, SetupStepStatus> = {};
+      (data ?? []).forEach((row) => {
         derived[row.step_key] = row.status;
       });
 
-      // Derived auto-completion (overrides setup_progress for these keys)
+      // entity_id is present → entity is registered
       derived.register_entity = "complete";
-      derived.build_org_departments =
-        (orgDeptRes.count ?? 0) > 0 ? "complete" : derived.build_org_departments ?? "not_started";
-      derived.upload_employees =
-        (uploadsRes.count ?? 0) > 0 ? "complete" : derived.upload_employees ?? "not_started";
+
+      // Derive composite kpi_setup status from its three sub-keys
+      const kpiSubKeys = ["set_driver_weightings", "configure_corporate_kpis", "configure_department_kpis"];
+      const kpiStatuses = kpiSubKeys.map((k) => derived[k] ?? "not_started");
+      if (kpiStatuses.every((s) => s === "complete")) {
+        derived["kpi_setup"] = "complete";
+      } else if (kpiStatuses.some((s) => s === "complete" || s === "in_progress")) {
+        derived["kpi_setup"] = "in_progress";
+      } else {
+        derived["kpi_setup"] = "not_started";
+      }
 
       setProgress(derived);
       setLoading(false);
@@ -82,7 +86,7 @@ function SetupLayout() {
     return () => {
       cancelled = true;
     };
-  }, [entity_id, allowed]);
+  }, [entity_id, entityLoading, allowed, location.pathname]);
 
   if (!allowed) {
     return (
@@ -100,7 +104,7 @@ function SetupLayout() {
   }
 
   return (
-    <div className="flex flex-col gap-4 lg:flex-row">
+    <div className="flex flex-col gap-3 lg:flex-row">
       <SetupChecklist
         progress={progress}
         loading={loading}

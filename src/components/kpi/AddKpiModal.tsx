@@ -59,20 +59,26 @@ type Props = {
   functional_department_id?: string | null;
   /** Pre-set when level === "individual" and called from the KPI Board. */
   person_id?: string | null;
+  /** Edit mode: the kpi_definitions row to update. */
+  editKpiDefId?: string | null;
+  /** Edit mode: the corporate_kpis or department_kpis row whose targets to update. */
+  editBoardKpiId?: string | null;
+  /** Edit mode: which target table to upsert into. */
+  editBoardLevel?: "corporate" | "department" | null;
 };
 
 const LEVEL_LABEL: Record<KpiLevel, string> = {
-  corporate: "Corporate",
+  corporate:  "Corporate",
   department: "Department",
   individual: "Individual",
 };
 
 const UNIT_PRESETS = [
-  { value: "%", label: "% (Percentage)" },
-  { value: "EUR", label: "EUR (Euros)" },
-  { value: "Count", label: "Count" },
-  { value: "score", label: "Score out of..." },
-  { value: "custom", label: "Custom..." },
+  { value: "%",      label: "% (Percentage)"  },
+  { value: "EUR",    label: "EUR (Euros)"      },
+  { value: "Count",  label: "Count"            },
+  { value: "score",  label: "Score out of..."  },
+  { value: "custom", label: "Custom..."        },
 ];
 
 const QUARTER_FIELDS: { key: QuarterPeriod; label: string }[] = [
@@ -110,6 +116,32 @@ function parseNum(s: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function syncFuncToLocalStorage(entityId: string, orgDeptId: string, funcDeptId: string) {
+  const key = `bb_dept_setup_${entityId}`;
+  try {
+    const stored = localStorage.getItem(key);
+    const assignments: Record<string, string[]> = stored
+      ? (JSON.parse(stored) as Record<string, string[]>)
+      : {};
+    const existing = assignments[orgDeptId] ?? [];
+    if (!existing.includes(funcDeptId)) {
+      assignments[orgDeptId] = [...existing, funcDeptId];
+      localStorage.setItem(key, JSON.stringify(assignments));
+    }
+  } catch {
+    // localStorage unavailable (SSR)
+  }
+}
+
+function reverseUnit(unit: string | null): { unitPreset: string; unitCustom: string; unitScoreOf: string } {
+  if (!unit) return { unitPreset: "", unitCustom: "", unitScoreOf: "" };
+  if (unit === "%" || unit === "EUR" || unit === "Count")
+    return { unitPreset: unit, unitCustom: "", unitScoreOf: "" };
+  const m = unit.match(/^Score out of (\d+)$/);
+  if (m) return { unitPreset: "score", unitCustom: "", unitScoreOf: m[1] };
+  return { unitPreset: "custom", unitCustom: unit, unitScoreOf: "" };
+}
+
 export function AddKpiModal({
   open,
   onOpenChange,
@@ -118,27 +150,123 @@ export function AddKpiModal({
   org_department_id: orgDeptIdProp = null,
   functional_department_id = null,
   person_id: personIdProp = null,
+  editKpiDefId = null,
+  editBoardKpiId = null,
+  editBoardLevel = null,
 }: Props) {
   const { person } = useAuth();
   const { entity_id } = useEntity();
   const { selected_year } = useYear();
 
+  const isEditMode = !!editKpiDefId;
+
   const [values, setValues] = useState<AddKpiFormValues>(EMPTY);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Internal state used only when levelProp is not provided (sidebar "Add KPI" button)
+  // Level / selector state (used when levelProp is not provided)
   const [internalLevel, setInternalLevel] = useState<KpiLevel>("corporate");
   const [selectedOrgDeptId, setSelectedOrgDeptId] = useState<string>("");
   const [selectedPersonId, setSelectedPersonId] = useState<string>("");
+  const [selectedFuncDeptId, setSelectedFuncDeptId] = useState<string>("");
   const [orgDepts, setOrgDepts] = useState<{ id: string; name: string }[]>([]);
+  const [funcDepts, setFuncDepts] = useState<{ id: string; name: string }[]>([]);
   const [people, setPeople] = useState<{ id: string; first_name: string; last_name: string }[]>([]);
+
+  // Corporate KPI link (for department KPIs)
+  const [corpKpisForLink, setCorpKpisForLink] = useState<{ id: string; title: string }[]>([]);
+  const [selectedCorpKpiId, setSelectedCorpKpiId] = useState<string>("__none__");
 
   const effectiveLevel = levelProp ?? internalLevel;
   const effectiveOrgDeptId = orgDeptIdProp ?? (effectiveLevel === "department" ? selectedOrgDeptId || null : null);
   const effectivePersonId = personIdProp ?? (effectiveLevel === "individual" ? selectedPersonId || null : null);
+  const effectiveFuncDeptId = functional_department_id ?? (selectedFuncDeptId || null);
 
-  // Fetch departments + people for the internal selectors when levelProp is absent
+  // Load functional departments when modal opens
+  useEffect(() => {
+    if (!open) return;
+    supabase
+      .from("functions")
+      .select("id, name")
+      .order("name")
+      .then(({ data }) => setFuncDepts(data ?? []));
+  }, [open]);
+
+  // Load corporate KPIs for the "Supports Corporate KPI" selector (department level)
+  useEffect(() => {
+    if (!open || !entity_id || effectiveLevel !== "department") {
+      setCorpKpisForLink([]);
+      return;
+    }
+    supabase
+      .from("corporate_kpis")
+      .select("id, kpi_definitions(title)")
+      .eq("entity_id", entity_id)
+      .eq("year", selected_year)
+      .order("display_order")
+      .then(({ data }) => {
+        setCorpKpisForLink(
+          (data ?? []).map((row) => ({
+            id: row.id,
+            title: (row.kpi_definitions as unknown as { title: string } | null)?.title ?? "Untitled",
+          })),
+        );
+      });
+  }, [open, entity_id, selected_year, effectiveLevel]);
+
+  // Pre-populate form in edit mode
+  useEffect(() => {
+    if (!open || !editKpiDefId) return;
+    void (async () => {
+      const { data: def } = await supabase
+        .from("kpi_definitions")
+        .select("title, description, kpi_type, driver, unit")
+        .eq("id", editKpiDefId)
+        .single();
+      if (!def) return;
+
+      const unitFields = reverseUnit(def.unit);
+      let quarter_targets: Record<QuarterPeriod, string> = { q1: "", q2: "", q3: "", q4: "" };
+      let binary_targets: Record<BinaryTargetPeriod, boolean> = { h1: false, fullyear: false };
+
+      if (editBoardKpiId && editBoardLevel) {
+        const tgtTable = editBoardLevel === "corporate" ? "corporate_kpi_targets" : "department_kpi_targets";
+        const fkCol    = editBoardLevel === "corporate" ? "corporate_kpi_id"      : "department_kpi_id";
+        const { data: tgts } = await supabase
+          .from(tgtTable as "corporate_kpi_targets")
+          .select("period, target_value, target_binary")
+          .eq(fkCol as "corporate_kpi_id", editBoardKpiId);
+        for (const t of tgts ?? []) {
+          if (["q1", "q2", "q3", "q4"].includes(t.period))
+            quarter_targets[t.period as QuarterPeriod] = t.target_value != null ? String(t.target_value) : "";
+          if (t.period === "h1")      binary_targets.h1       = t.target_binary ?? false;
+          if (t.period === "fullyear") binary_targets.fullyear = t.target_binary ?? false;
+        }
+
+        // Pre-populate corp link if editing a dept KPI
+        if (editBoardLevel === "department") {
+          const { data: deptRow } = await supabase
+            .from("department_kpis")
+            .select("corporate_kpi_id")
+            .eq("id", editBoardKpiId)
+            .single();
+          setSelectedCorpKpiId(deptRow?.corporate_kpi_id ?? "__none__");
+        }
+      }
+
+      setValues({
+        title: def.title,
+        description: def.description ?? "",
+        kpi_type: def.kpi_type as KpiType,
+        driver: def.driver as KpiDriver,
+        ...unitFields,
+        quarter_targets,
+        binary_targets,
+      });
+    })();
+  }, [open, editKpiDefId, editBoardKpiId, editBoardLevel]);
+
+  // Load org departments + people for internal level picker
   useEffect(() => {
     if (!open || levelProp || !entity_id) return;
     supabase
@@ -155,66 +283,90 @@ export function AddKpiModal({
       .then(({ data }) => setPeople(data ?? []));
   }, [open, levelProp, entity_id]);
 
-  const update = <K extends keyof AddKpiFormValues>(
-    key: K,
-    value: AddKpiFormValues[K],
-  ) => setValues((v) => ({ ...v, [key]: value }));
+  const update = <K extends keyof AddKpiFormValues>(key: K, value: AddKpiFormValues[K]) =>
+    setValues((v) => ({ ...v, [key]: value }));
 
-  // Derived computed targets for progressive/benchmark KPIs
   const q1 = parseNum(values.quarter_targets.q1);
   const q2 = parseNum(values.quarter_targets.q2);
   const q3 = parseNum(values.quarter_targets.q3);
   const q4 = parseNum(values.quarter_targets.q4);
-  const h1Computed = q1 !== null && q2 !== null ? q1 + q2 : null;
-  const h2Computed = q3 !== null && q4 !== null ? q3 + q4 : null;
-  const fullYearComputed =
-    h1Computed !== null && h2Computed !== null ? h1Computed + h2Computed : null;
+  const h1Computed        = q1 !== null && q2 !== null ? q1 + q2 : null;
+  const h2Computed        = q3 !== null && q4 !== null ? q3 + q4 : null;
+  const fullYearComputed  = h1Computed !== null && h2Computed !== null ? h1Computed + h2Computed : null;
 
   const buildNumericTargetRows = (fkName: string, fkValue: string) => {
     const rows: Record<string, unknown>[] = [];
-    const quarters: [QuarterPeriod, number | null][] = [
-      ["q1", q1],
-      ["q2", q2],
-      ["q3", q3],
-      ["q4", q4],
-    ];
+    const quarters: [QuarterPeriod, number | null][] = [["q1", q1], ["q2", q2], ["q3", q3], ["q4", q4]];
     for (const [period, val] of quarters) {
       if (val !== null) rows.push({ [fkName]: fkValue, period, target_value: val });
     }
-    if (h1Computed !== null)
-      rows.push({ [fkName]: fkValue, period: "h1", target_value: h1Computed });
-    if (h2Computed !== null)
-      rows.push({ [fkName]: fkValue, period: "h2", target_value: h2Computed });
-    if (fullYearComputed !== null)
-      rows.push({ [fkName]: fkValue, period: "fullyear", target_value: fullYearComputed });
+    if (h1Computed !== null)       rows.push({ [fkName]: fkValue, period: "h1",       target_value: h1Computed });
+    if (h2Computed !== null)       rows.push({ [fkName]: fkValue, period: "h2",       target_value: h2Computed });
+    if (fullYearComputed !== null) rows.push({ [fkName]: fkValue, period: "fullyear", target_value: fullYearComputed });
     return rows;
   };
 
   const buildBinaryTargetRows = (fkName: string, fkValue: string) => [
-    { [fkName]: fkValue, period: "h1", target_binary: values.binary_targets.h1 },
+    { [fkName]: fkValue, period: "h1",       target_binary: values.binary_targets.h1       },
     { [fkName]: fkValue, period: "fullyear", target_binary: values.binary_targets.fullyear },
   ];
 
   const handleSave = async () => {
-    if (!values.title.trim()) {
-      setTitleError("KPI Title is required.");
-      return;
-    }
+    if (!values.title.trim()) { setTitleError("KPI Title is required."); return; }
     setTitleError(null);
 
-    if (!entity_id) return toast.error("No entity selected.");
+    if (!entity_id)  return toast.error("No entity selected.");
     if (!person?.id) return toast.error("Cannot identify current user.");
-    if (effectiveLevel === "department" && !effectiveOrgDeptId && !functional_department_id) {
+    if (!isEditMode && effectiveLevel === "department" && !effectiveOrgDeptId && !functional_department_id)
       return toast.error("Please select a department.");
-    }
-    if (effectiveLevel === "individual" && !effectivePersonId) {
+    if (!isEditMode && effectiveLevel === "department" && !effectiveFuncDeptId)
+      return toast.error("Please select a function for this KPI.");
+    if (effectiveLevel === "individual" && !effectivePersonId)
       return toast.error("Please select an employee.");
-    }
 
     setSaving(true);
     try {
-      const unit = deriveUnit(values.unitPreset, values.unitCustom, values.unitScoreOf);
+      const unit     = deriveUnit(values.unitPreset, values.unitCustom, values.unitScoreOf);
+      const isBinary = values.kpi_type === "binary";
 
+      // ── Edit mode ─────────────────────────────────────────────────────────
+      if (isEditMode && editKpiDefId) {
+        const updRes = await supabase
+          .from("kpi_definitions")
+          .update({ title: values.title.trim(), description: values.description.trim() || null, kpi_type: values.kpi_type, driver: values.driver, unit })
+          .eq("id", editKpiDefId);
+        if (updRes.error) throw new Error(updRes.error.message);
+
+        if (editBoardKpiId && editBoardLevel) {
+          const tgtTable  = editBoardLevel === "corporate" ? "corporate_kpi_targets" : "department_kpi_targets";
+          const fkCol     = editBoardLevel === "corporate" ? "corporate_kpi_id"      : "department_kpi_id";
+          const targetRows = isBinary
+            ? buildBinaryTargetRows(fkCol, editBoardKpiId)
+            : buildNumericTargetRows(fkCol, editBoardKpiId);
+          if (targetRows.length > 0) {
+            const upRes = await supabase
+              .from(tgtTable as "corporate_kpi_targets")
+              .upsert(targetRows as never, { onConflict: `${fkCol},period` });
+            if (upRes.error) throw new Error(upRes.error.message);
+          }
+
+          // Update corporate_kpi_id link for dept KPIs
+          if (editBoardLevel === "department") {
+            await supabase
+              .from("department_kpis")
+              .update({ corporate_kpi_id: selectedCorpKpiId === "__none__" ? null : selectedCorpKpiId || null })
+              .eq("id", editBoardKpiId);
+          }
+        }
+
+        toast.success("KPI updated.");
+        onSuccess();
+        resetForm();
+        onOpenChange(false);
+        return;
+      }
+
+      // ── Add mode ──────────────────────────────────────────────────────────
       const defRes = await supabase
         .from("kpi_definitions")
         .insert({
@@ -230,20 +382,17 @@ export function AddKpiModal({
         })
         .select("id")
         .single();
-      if (defRes.error || !defRes.data) {
+      if (defRes.error || !defRes.data)
         throw new Error(defRes.error?.message ?? "Failed to insert KPI definition.");
-      }
       const kpiDefinitionId = defRes.data.id;
-      const isBinary = values.kpi_type === "binary";
 
       if (effectiveLevel === "corporate") {
-        const countRes = await supabase
+        const { count: existingCount } = await supabase
           .from("corporate_kpis")
           .select("id", { count: "exact", head: true })
           .eq("entity_id", entity_id)
           .eq("year", selected_year);
-        if (countRes.error) throw new Error(countRes.error.message);
-        const display_order = (countRes.count ?? 0) + 1;
+        const display_order = (existingCount ?? 0) + 1;
 
         const corpRes = await supabase
           .from("corporate_kpis")
@@ -263,14 +412,13 @@ export function AddKpiModal({
       } else if (effectiveLevel === "department") {
         const filterCol = effectiveOrgDeptId ? "org_department_id" : "functional_department_id";
         const filterVal = (effectiveOrgDeptId ?? functional_department_id) as string;
-        const countRes = await supabase
+        const { count: existingCount } = await supabase
           .from("department_kpis")
           .select("id", { count: "exact", head: true })
           .eq("entity_id", entity_id)
           .eq("year", selected_year)
           .eq(filterCol, filterVal);
-        if (countRes.error) throw new Error(countRes.error.message);
-        const display_order = (countRes.count ?? 0) + 1;
+        const display_order = (existingCount ?? 0) + 1;
 
         const deptRes = await supabase
           .from("department_kpis")
@@ -279,8 +427,9 @@ export function AddKpiModal({
             kpi_definition_id: kpiDefinitionId,
             year: selected_year,
             display_order,
-            org_department_id: effectiveOrgDeptId ?? null,
-            functional_department_id: functional_department_id ?? null,
+            org_department_id:       effectiveOrgDeptId ?? null,
+            functional_department_id: effectiveFuncDeptId ?? null,
+            corporate_kpi_id:        selectedCorpKpiId === "__none__" ? null : selectedCorpKpiId || null,
           })
           .select("id")
           .single();
@@ -294,15 +443,18 @@ export function AddKpiModal({
           const tRes = await supabase.from("department_kpi_targets").insert(targetRows as never);
           if (tRes.error) throw new Error(tRes.error.message);
         }
+
+        if (effectiveOrgDeptId && effectiveFuncDeptId)
+          syncFuncToLocalStorage(entity_id, effectiveOrgDeptId, effectiveFuncDeptId);
       } else {
-        const countRes = await supabase
+        // individual
+        const { count: existingCount } = await supabase
           .from("individual_kpis")
           .select("id", { count: "exact", head: true })
           .eq("entity_id", entity_id)
           .eq("year", selected_year)
           .eq("person_id", effectivePersonId as string);
-        if (countRes.error) throw new Error(countRes.error.message);
-        const display_order = (countRes.count ?? 0) + 1;
+        const display_order = (existingCount ?? 0) + 1;
 
         const indRes = await supabase
           .from("individual_kpis")
@@ -332,11 +484,7 @@ export function AddKpiModal({
 
       toast.success(`${LEVEL_LABEL[effectiveLevel]} KPI added.`);
       onSuccess();
-      setValues(EMPTY);
-      setTitleError(null);
-      setInternalLevel("corporate");
-      setSelectedOrgDeptId("");
-      setSelectedPersonId("");
+      resetForm();
       onOpenChange(false);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -347,14 +495,19 @@ export function AddKpiModal({
     }
   };
 
-  // Only reset form on explicit cancel — not on every close — so state survives tab switches.
-  const handleCancel = () => {
-    if (saving) return;
+  const resetForm = () => {
     setValues(EMPTY);
     setTitleError(null);
     setInternalLevel("corporate");
     setSelectedOrgDeptId("");
     setSelectedPersonId("");
+    setSelectedFuncDeptId("");
+    setSelectedCorpKpiId("__none__");
+  };
+
+  const handleCancel = () => {
+    if (saving) return;
+    resetForm();
     onOpenChange(false);
   };
 
@@ -371,14 +524,14 @@ export function AddKpiModal({
         onPointerDownOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>Add {LEVEL_LABEL[effectiveLevel]} KPI</DialogTitle>
+          <DialogTitle>{isEditMode ? "Edit KPI" : `Add ${LEVEL_LABEL[effectiveLevel]} KPI`}</DialogTitle>
           <DialogDescription>
-            Define the KPI details and set targets by quarter.
+            {isEditMode ? "Update the KPI details and targets." : "Define the KPI details and set targets by quarter."}
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-4 py-2">
-          {/* Level selector — only shown when level is not pre-set by the caller */}
+          {/* Level selector */}
           {!levelProp && (
             <div className="space-y-1.5">
               <Label>Assign to</Label>
@@ -388,11 +541,11 @@ export function AddKpiModal({
                   setInternalLevel(v as KpiLevel);
                   setSelectedOrgDeptId("");
                   setSelectedPersonId("");
+                  setSelectedFuncDeptId("");
+                  setSelectedCorpKpiId("__none__");
                 }}
               >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="corporate">Corporate</SelectItem>
                   <SelectItem value="department">Department</SelectItem>
@@ -402,36 +555,57 @@ export function AddKpiModal({
             </div>
           )}
 
-          {/* Department picker — shown when level is "department" and no dept pre-set */}
+          {/* Department picker */}
           {effectiveLevel === "department" && !orgDeptIdProp && !functional_department_id && (
             <div className="space-y-1.5">
               <Label>Department <span className="text-destructive">*</span></Label>
               <Select value={selectedOrgDeptId} onValueChange={setSelectedOrgDeptId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select department" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
                 <SelectContent>
-                  {orgDepts.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  {orgDepts.map((d) => <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Function picker */}
+          {effectiveLevel === "department" && !functional_department_id && (
+            <div className="space-y-1.5">
+              <Label>Function <span className="text-destructive">*</span></Label>
+              <Select value={selectedFuncDeptId} onValueChange={setSelectedFuncDeptId}>
+                <SelectTrigger><SelectValue placeholder="Select a function" /></SelectTrigger>
+                <SelectContent>
+                  {funcDepts.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Corporate KPI link — only for department KPIs */}
+          {effectiveLevel === "department" && (
+            <div className="space-y-1.5">
+              <Label>Supports Corporate KPI</Label>
+              <Select value={selectedCorpKpiId} onValueChange={setSelectedCorpKpiId}>
+                <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">None</SelectItem>
+                  {corpKpisForLink.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
           )}
 
-          {/* Person picker — shown when level is "individual" and no person pre-set */}
+          {/* Person picker */}
           {effectiveLevel === "individual" && !personIdProp && (
             <div className="space-y-1.5">
               <Label>Employee <span className="text-destructive">*</span></Label>
               <Select value={selectedPersonId} onValueChange={setSelectedPersonId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select employee" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                 <SelectContent>
                   {people.map((p) => (
-                    <SelectItem key={p.id} value={p.id}>
-                      {p.first_name} {p.last_name}
-                    </SelectItem>
+                    <SelectItem key={p.id} value={p.id}>{p.first_name} {p.last_name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -440,16 +614,11 @@ export function AddKpiModal({
 
           {/* Title */}
           <div className="space-y-1.5">
-            <Label htmlFor="kpi-title">
-              KPI Title <span className="text-destructive">*</span>
-            </Label>
+            <Label htmlFor="kpi-title">KPI Title <span className="text-destructive">*</span></Label>
             <Input
               id="kpi-title"
               value={values.title}
-              onChange={(e) => {
-                update("title", e.target.value);
-                if (titleError) setTitleError(null);
-              }}
+              onChange={(e) => { update("title", e.target.value); if (titleError) setTitleError(null); }}
               placeholder="e.g. Net Revenue Growth"
             />
             {titleError && <p className="text-xs text-destructive">{titleError}</p>}
@@ -470,60 +639,28 @@ export function AddKpiModal({
           {/* KPI Type */}
           <div className="space-y-2">
             <Label>KPI Type</Label>
-            <RadioGroup
-              value={values.kpi_type}
-              onValueChange={(v) => update("kpi_type", v as KpiType)}
-              className="gap-2"
-            >
-              <Label
-                htmlFor="type-progressive"
-                className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-accent"
-              >
-                <RadioGroupItem id="type-progressive" value="progressive" className="mt-0.5" />
-                <span className="space-y-0.5">
-                  <span className="block text-sm font-medium">Progressive</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Tracked cumulatively by value
+            <RadioGroup value={values.kpi_type} onValueChange={(v) => update("kpi_type", v as KpiType)} className="gap-2">
+              {[
+                { id: "type-progressive", value: "progressive", label: "Progressive", sub: "Tracked cumulatively by value" },
+                { id: "type-binary",      value: "binary",      label: "Binary",      sub: "Achieved or not achieved"       },
+                { id: "type-benchmark",   value: "benchmark",   label: "Benchmark",   sub: "Point-in-time score"            },
+              ].map((t) => (
+                <Label key={t.id} htmlFor={t.id} className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-accent">
+                  <RadioGroupItem id={t.id} value={t.value} className="mt-0.5" />
+                  <span className="space-y-0.5">
+                    <span className="block text-sm font-medium">{t.label}</span>
+                    <span className="block text-xs text-muted-foreground">{t.sub}</span>
                   </span>
-                </span>
-              </Label>
-              <Label
-                htmlFor="type-binary"
-                className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-accent"
-              >
-                <RadioGroupItem id="type-binary" value="binary" className="mt-0.5" />
-                <span className="space-y-0.5">
-                  <span className="block text-sm font-medium">Binary</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Achieved or not achieved
-                  </span>
-                </span>
-              </Label>
-              <Label
-                htmlFor="type-benchmark"
-                className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-accent"
-              >
-                <RadioGroupItem id="type-benchmark" value="benchmark" className="mt-0.5" />
-                <span className="space-y-0.5">
-                  <span className="block text-sm font-medium">Benchmark</span>
-                  <span className="block text-xs text-muted-foreground">
-                    Point-in-time score
-                  </span>
-                </span>
-              </Label>
+                </Label>
+              ))}
             </RadioGroup>
           </div>
 
           {/* Driver */}
           <div className="space-y-1.5">
             <Label htmlFor="kpi-driver">Driver</Label>
-            <Select
-              value={values.driver}
-              onValueChange={(v) => update("driver", v as KpiDriver)}
-            >
-              <SelectTrigger id="kpi-driver">
-                <SelectValue />
-              </SelectTrigger>
+            <Select value={values.driver} onValueChange={(v) => update("driver", v as KpiDriver)}>
+              <SelectTrigger id="kpi-driver"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="growth">Growth</SelectItem>
                 <SelectItem value="efficiency">Efficiency</SelectItem>
@@ -537,55 +674,21 @@ export function AddKpiModal({
             <Label htmlFor="kpi-unit-preset">Unit</Label>
             <Select
               value={values.unitPreset}
-              onValueChange={(v) => {
-                update("unitPreset", v);
-                update("unitCustom", "");
-                update("unitScoreOf", "");
-              }}
+              onValueChange={(v) => { update("unitPreset", v); update("unitCustom", ""); update("unitScoreOf", ""); }}
             >
-              <SelectTrigger id="kpi-unit-preset">
-                <SelectValue placeholder="Select unit (optional)" />
-              </SelectTrigger>
+              <SelectTrigger id="kpi-unit-preset"><SelectValue placeholder="Select unit (optional)" /></SelectTrigger>
               <SelectContent>
-                {UNIT_PRESETS.map((u) => (
-                  <SelectItem key={u.value} value={u.value}>
-                    {u.label}
-                  </SelectItem>
-                ))}
+                {UNIT_PRESETS.map((u) => <SelectItem key={u.value} value={u.value}>{u.label}</SelectItem>)}
               </SelectContent>
             </Select>
-
             {values.unitPreset === "score" && (
               <div className="flex items-center gap-2">
                 <span className="text-sm text-muted-foreground">Score out of</span>
-                <Input
-                  type="number"
-                  min={1}
-                  placeholder="e.g. 5"
-                  value={values.unitScoreOf}
-                  onChange={(e) => update("unitScoreOf", e.target.value)}
-                  className="w-24"
-                />
+                <Input type="number" min={1} placeholder="e.g. 5" value={values.unitScoreOf} onChange={(e) => update("unitScoreOf", e.target.value)} className="w-24" />
               </div>
             )}
-
             {values.unitPreset === "custom" && (
-              <Input
-                placeholder="Enter unit label"
-                value={values.unitCustom}
-                onChange={(e) => update("unitCustom", e.target.value)}
-              />
-            )}
-
-            {values.unitPreset && values.unitPreset !== "score" && values.unitPreset !== "custom" && (
-              <p className="text-xs text-muted-foreground">
-                Stored as: <span className="font-medium">{values.unitPreset}</span>
-              </p>
-            )}
-            {values.unitPreset === "score" && values.unitScoreOf && (
-              <p className="text-xs text-muted-foreground">
-                Stored as: <span className="font-medium">Score out of {values.unitScoreOf}</span>
-              </p>
+              <Input placeholder="Enter unit label" value={values.unitCustom} onChange={(e) => update("unitCustom", e.target.value)} />
             )}
           </div>
 
@@ -600,47 +703,30 @@ export function AddKpiModal({
 
             {(values.kpi_type === "progressive" || values.kpi_type === "benchmark") && (
               <div className="space-y-3">
-                {/* Editable quarters */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {QUARTER_FIELDS.map((f) => (
                     <div key={f.key} className="space-y-1.5">
-                      <Label htmlFor={`target-${f.key}`} className="text-xs">
-                        {f.label}
-                      </Label>
+                      <Label htmlFor={`target-${f.key}`} className="text-xs">{f.label}</Label>
                       <Input
                         id={`target-${f.key}`}
                         type="number"
                         inputMode="decimal"
                         placeholder="—"
                         value={values.quarter_targets[f.key]}
-                        onChange={(e) =>
-                          setValues((v) => ({
-                            ...v,
-                            quarter_targets: {
-                              ...v.quarter_targets,
-                              [f.key]: e.target.value,
-                            },
-                          }))
-                        }
+                        onChange={(e) => setValues((v) => ({ ...v, quarter_targets: { ...v.quarter_targets, [f.key]: e.target.value } }))}
                       />
                     </div>
                   ))}
                 </div>
-
-                {/* Auto-calculated summaries */}
                 <div className="grid grid-cols-3 gap-3">
                   {[
                     { label: "H1 (Q1+Q2)", value: h1Computed },
                     { label: "H2 (Q3+Q4)", value: h2Computed },
-                    { label: "Full Year", value: fullYearComputed },
+                    { label: "Full Year",   value: fullYearComputed },
                   ].map(({ label, value }) => (
                     <div key={label} className="rounded-md border bg-background p-2">
-                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
-                        {label}
-                      </p>
-                      <p className="text-sm font-medium text-muted-foreground">
-                        {value !== null ? value : "—"}
-                      </p>
+                      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
+                      <p className="text-sm font-medium text-muted-foreground">{value !== null ? value : "—"}</p>
                     </div>
                   ))}
                 </div>
@@ -649,48 +735,31 @@ export function AddKpiModal({
 
             {values.kpi_type === "binary" && (
               <div className="space-y-3">
-                <div className="flex items-center justify-between rounded-md border bg-background p-3">
-                  <Label htmlFor="binary-h1" className="text-sm font-normal">
-                    Achieved by H1?
-                  </Label>
-                  <Switch
-                    id="binary-h1"
-                    checked={values.binary_targets.h1}
-                    onCheckedChange={(checked) =>
-                      setValues((v) => ({
-                        ...v,
-                        binary_targets: { ...v.binary_targets, h1: checked },
-                      }))
-                    }
-                  />
-                </div>
-                <div className="flex items-center justify-between rounded-md border bg-background p-3">
-                  <Label htmlFor="binary-fullyear" className="text-sm font-normal">
-                    Achieved by Full Year?
-                  </Label>
-                  <Switch
-                    id="binary-fullyear"
-                    checked={values.binary_targets.fullyear}
-                    onCheckedChange={(checked) =>
-                      setValues((v) => ({
-                        ...v,
-                        binary_targets: { ...v.binary_targets, fullyear: checked },
-                      }))
-                    }
-                  />
-                </div>
+                {[
+                  { id: "binary-h1",       field: "h1"       as BinaryTargetPeriod, label: "Achieved by H1?"        },
+                  { id: "binary-fullyear", field: "fullyear" as BinaryTargetPeriod, label: "Achieved by Full Year?"  },
+                ].map((b) => (
+                  <div key={b.id} className="flex items-center justify-between rounded-md border bg-background p-3">
+                    <Label htmlFor={b.id} className="text-sm font-normal">{b.label}</Label>
+                    <Switch
+                      id={b.id}
+                      checked={values.binary_targets[b.field]}
+                      onCheckedChange={(checked) =>
+                        setValues((v) => ({ ...v, binary_targets: { ...v.binary_targets, [b.field]: checked } }))
+                      }
+                    />
+                  </div>
+                ))}
               </div>
             )}
           </div>
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleCancel} disabled={saving}>
-            Cancel
-          </Button>
+          <Button variant="outline" onClick={handleCancel} disabled={saving}>Cancel</Button>
           <Button onClick={handleSave} disabled={saving}>
             {saving && <Loader2 className="h-4 w-4 animate-spin" />}
-            Save KPI
+            {isEditMode ? "Save Changes" : "Save KPI"}
           </Button>
         </DialogFooter>
       </DialogContent>

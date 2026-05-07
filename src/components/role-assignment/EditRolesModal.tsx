@@ -168,7 +168,7 @@ export function EditRolesModal({
 
           <div className="flex flex-col gap-2">
             <Label htmlFor="func-dept" className="text-sm font-medium">
-              Functional Department
+              Function
             </Label>
             <Select
               value={funcDeptId ?? NONE_VALUE}
@@ -176,7 +176,7 @@ export function EditRolesModal({
               disabled={saving}
             >
               <SelectTrigger id="func-dept">
-                <SelectValue placeholder="Select a functional department" />
+                <SelectValue placeholder="Select a function" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={NONE_VALUE}>— None —</SelectItem>

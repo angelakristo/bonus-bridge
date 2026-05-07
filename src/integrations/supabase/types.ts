@@ -324,7 +324,7 @@ export type Database = {
             foreignKeyName: "department_kpis_functional_department_id_fkey"
             columns: ["functional_department_id"]
             isOneToOne: false
-            referencedRelation: "functional_departments"
+            referencedRelation: "functions"
             referencedColumns: ["id"]
           },
           {
@@ -632,7 +632,7 @@ export type Database = {
           },
         ]
       }
-      functional_departments: {
+      functions: {
         Row: {
           id: string
           name: string
@@ -899,6 +899,7 @@ export type Database = {
           id: string
           is_active: boolean
           last_name: string
+          position: string | null
         }
         Insert: {
           annual_salary?: number | null
@@ -911,6 +912,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_name: string
+          position?: string | null
         }
         Update: {
           annual_salary?: number | null
@@ -923,6 +925,7 @@ export type Database = {
           id?: string
           is_active?: boolean
           last_name?: string
+          position?: string | null
         }
         Relationships: [
           {
@@ -952,7 +955,7 @@ export type Database = {
             foreignKeyName: "people_functional_departments_functional_department_id_fkey"
             columns: ["functional_department_id"]
             isOneToOne: false
-            referencedRelation: "functional_departments"
+            referencedRelation: "functions"
             referencedColumns: ["id"]
           },
           {

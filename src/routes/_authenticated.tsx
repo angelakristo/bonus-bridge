@@ -3,7 +3,21 @@ import { useEffect } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
+import { useSetupStatus } from "@/contexts/SetupContext";
 import { AppShell } from "@/components/app-shell/AppShell";
+
+// Routes accessible while setup is still incomplete (CEO / HR Rep)
+const SETUP_ALLOWED_PATHS = new Set([
+  "/setup",
+  "/register-entity",
+  "/org-departments",
+  "/team-setup",
+  "/kpi-setup",
+  "/bonus-setup",
+  "/driver-weightings",
+  "/role-assignment",
+  "/employee-upload",
+]);
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthenticatedLayout,
@@ -12,6 +26,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthenticatedLayout() {
   const { session, ready: authReady, loading: authLoading, roles, supabaseUser, person } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
+  const { isSetupComplete, loading: setupLoading } = useSetupStatus();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -55,6 +70,16 @@ function AuthenticatedLayout() {
       return;
     }
 
+    // Setup lockdown: CEO / HR Rep must complete setup before accessing other routes
+    const isSetupUser = roles.includes("ceo") || roles.includes("hr_rep");
+    if (isSetupUser && entity_id && !setupLoading && !isSetupComplete) {
+      if (!SETUP_ALLOWED_PATHS.has(location.pathname)) {
+        logGuard("/setup", "setup incomplete — redirecting locked route to setup checklist");
+        navigate({ to: "/setup", replace: true });
+        return;
+      }
+    }
+
     logGuard(null, person ? "stay on requested authenticated route" : "stay on requested route with resolved missing person profile");
   }, [
     authReady,
@@ -70,6 +95,8 @@ function AuthenticatedLayout() {
     supabaseUser?.id,
     isHrRep,
     person,
+    isSetupComplete,
+    setupLoading,
   ]);
 
   if (!authReady || authLoading || entityLoading || !session) {

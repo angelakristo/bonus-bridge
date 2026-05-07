@@ -93,21 +93,16 @@ const EMPTY_PANEL: PanelState = {
 };
 
 async function fetchLibrary(entityId: string, year: number): Promise<KpiCardData[]> {
-  const { data, error } = await supabase
-    .from("kpi_definitions")
-    .select("id, title, description, driver, kpi_type, unit")
-    .eq("entity_id", entityId)
-    .eq("year", year)
-    .eq("is_active", true)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((d) => ({
-    id: d.id, title: d.title, description: d.description ?? null,
-    driver: d.driver as KpiCardData["driver"],
-    kpi_type: d.kpi_type as KpiCardData["kpi_type"],
-    unit: d.unit,
-    yearend_target_value: null, yearend_target_binary: null,
-  }));
+  const { data: orgDepts } = await supabase
+    .from("organisational_departments")
+    .select("id")
+    .eq("entity_id", entityId);
+  const deptIds = (orgDepts ?? []).map((d) => d.id);
+  const [corpKpis, ...deptArrays] = await Promise.all([
+    fetchCorporateKpis(entityId, year),
+    ...deptIds.map((id) => fetchDepartmentKpis(entityId, year, id)),
+  ]);
+  return [...corpKpis, ...deptArrays.flat()];
 }
 
 async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCardData[]> {

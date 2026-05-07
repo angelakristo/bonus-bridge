@@ -110,7 +110,7 @@ export function KpiTable({
   isDeleteMode, selectedForDelete, onToggleSelect,
   corpKpisForLink,
 }: Props) {
-  const showTargets = variant !== "library";
+  const showTargets = true;
   const showActions = variant !== "library" && (!!onEdit || !!onDelete) && !isEditMode && !isDeleteMode;
 
   if (loading) {
@@ -298,6 +298,18 @@ export function KpiTable({
                     ) : (
                       <span className="text-muted-foreground">—</span>
                     )
+                  ) : kpi.linked_dept_kpi_titles?.length ? (
+                    <div className="flex flex-col gap-0.5">
+                      {kpi.linked_dept_kpi_titles.map((t, i) => (
+                        <span key={i} className="block break-words whitespace-normal font-medium text-foreground">
+                          ↗ {t}
+                        </span>
+                      ))}
+                    </div>
+                  ) : kpi.corp_kpi_title ? (
+                    <span className="block break-words whitespace-normal font-medium text-foreground">
+                      ↗ {kpi.corp_kpi_title}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground">—</span>
                   )}

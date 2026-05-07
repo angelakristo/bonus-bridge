@@ -6,7 +6,7 @@ import { useEntity } from "@/contexts/EntityContext";
 type SetupContextValue = {
   isSetupComplete: boolean;
   loading: boolean;
-  refresh: () => void;
+  refresh: () => Promise<void>;
 };
 
 const SetupContext = createContext<SetupContextValue | undefined>(undefined);
@@ -55,9 +55,9 @@ export function SetupProvider({ children }: { children: ReactNode }) {
     void load();
   }, [load]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((): Promise<void> => {
     refreshCountRef.current += 1;
-    void load();
+    return load();
   }, [load]);
 
   return (

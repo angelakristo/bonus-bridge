@@ -10,13 +10,10 @@ import {
   CheckSquare,
   History,
   ChevronDown,
-  UserPlus,
-  PlusCircle,
   type LucideIcon,
 } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { useEntity } from "@/contexts/EntityContext";
 import { useSetupStatus } from "@/contexts/SetupContext";
 import type { Database } from "@/integrations/supabase/types";
 import {
@@ -25,7 +22,6 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -34,9 +30,6 @@ import {
   SidebarMenuSubItem,
 } from "@/components/ui/sidebar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Button } from "@/components/ui/button";
-import { AddEmployeeManuallyModal } from "@/components/employee-upload/AddEmployeeManuallyModal";
-import { AddKpiModal } from "@/components/kpi/AddKpiModal";
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
@@ -103,17 +96,12 @@ function hasAnyRole(userRoles: UserRole[], allowed: UserRole[]) {
 }
 
 export function AppSidebar() {
-  const { roles, person } = useAuth();
-  const { entity_id } = useEntity();
+  const { roles } = useAuth();
   const { isSetupComplete, loading: setupLoading } = useSetupStatus();
   const location = useLocation();
 
-  const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
-  const [addKpiOpen, setAddKpiOpen] = useState(false);
-
   const isCeo = roles.includes("ceo");
   const isHrRep = roles.includes("hr_rep");
-  const showActionButtons = isCeo || isHrRep;
 
   // Lock all non-Setup nav items until setup is complete (CEO / HR Rep only)
   const isLocked = (isCeo || isHrRep) && !isSetupComplete && !setupLoading;
@@ -136,29 +124,6 @@ export function AppSidebar() {
   return (
     <>
       <Sidebar collapsible="icon">
-        {/* Action buttons — hidden while setup is locked */}
-        {showActionButtons && !isLocked && (
-          <SidebarHeader className="border-b p-3 gap-2 group-data-[collapsible=icon]:hidden">
-            <Button
-              size="sm"
-              className="w-full justify-start gap-2 text-xs"
-              onClick={() => setAddEmployeeOpen(true)}
-            >
-              <UserPlus className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Add Team Member</span>
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full justify-start gap-2 text-xs"
-              onClick={() => setAddKpiOpen(true)}
-            >
-              <PlusCircle className="h-3.5 w-3.5 shrink-0" />
-              <span className="truncate">Add KPI</span>
-            </Button>
-          </SidebarHeader>
-        )}
-
         <SidebarContent>
           {isCeo ? (
             // CEO: My Dashboard (flat) + grouped sections + Setup (flat, hidden post-setup)
@@ -281,22 +246,6 @@ export function AppSidebar() {
         </SidebarContent>
       </Sidebar>
 
-      {/* Modals */}
-      {showActionButtons && !isLocked && entity_id && person?.id && (
-        <>
-          <AddEmployeeManuallyModal
-            open={addEmployeeOpen}
-            onOpenChange={setAddEmployeeOpen}
-            entityId={entity_id}
-            onCreated={() => setAddEmployeeOpen(false)}
-          />
-          <AddKpiModal
-            open={addKpiOpen}
-            onOpenChange={setAddKpiOpen}
-            onSuccess={() => setAddKpiOpen(false)}
-          />
-        </>
-      )}
     </>
   );
 }

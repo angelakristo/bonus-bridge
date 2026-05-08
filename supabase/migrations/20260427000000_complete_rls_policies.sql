@@ -118,7 +118,16 @@ USING (entity_id = public.get_my_entity_id());
 DROP POLICY IF EXISTS "entity_members_can_insert_individual_kpis" ON public.individual_kpis;
 CREATE POLICY "entity_members_can_insert_individual_kpis"
 ON public.individual_kpis FOR INSERT TO authenticated
-WITH CHECK (entity_id = public.get_my_entity_id());
+WITH CHECK (
+  entity_id = public.get_my_entity_id()
+  AND (
+    -- CEO and HR Rep may insert with any status, including 'approved' (direct assignment)
+    'ceo'::public.user_role    = ANY(public.get_my_roles())
+    OR 'hr_rep'::public.user_role = ANY(public.get_my_roles())
+    -- All other roles (manager, employee) may only insert non-approved statuses
+    OR status != 'approved'::public.kpi_status
+  )
+);
 
 DROP POLICY IF EXISTS "entity_members_can_update_individual_kpis" ON public.individual_kpis;
 CREATE POLICY "entity_members_can_update_individual_kpis"

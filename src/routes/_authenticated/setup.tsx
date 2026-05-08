@@ -5,12 +5,14 @@ import { CheckCircle2, Circle, Loader2, ArrowRight } from "lucide-react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
+import { useSetupStatus } from "@/contexts/SetupContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { Database } from "@/integrations/supabase/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { STEPS } from "@/components/setup/steps";
+import { BridgeTransition } from "@/components/ui/bridge-transition";
 
 type SetupStepStatus = Database["public"]["Enums"]["setup_step_status"];
 
@@ -29,9 +31,12 @@ const ALLOWED_ROLES = ["ceo", "hr_rep"] as const;
 function SetupPage() {
   const { roles } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
+  const { refresh: refreshSetupStatus } = useSetupStatus();
   const navigate = useNavigate();
   const [progress, setProgress] = useState<Record<string, SetupStepStatus>>({});
   const [loading, setLoading] = useState(true);
+  const [transitioning, setTransitioning] = useState(false);
+  const [showBridgeAnimation, setShowBridgeAnimation] = useState(false);
 
   const allowed = roles.some((r) => (ALLOWED_ROLES as readonly string[]).includes(r));
 
@@ -127,6 +132,7 @@ function SetupPage() {
   }
 
   return (
+    <>
     <div className="mx-auto w-full max-w-3xl space-y-3">
       <div>
         <h1 className="text-xl font-semibold tracking-tight">Setup Checklist</h1>
@@ -194,13 +200,36 @@ function SetupPage() {
 
           {completedCount === STEPS.length && (
             <div className="flex justify-end pt-2">
-              <Button size="lg" onClick={() => void navigate({ to: "/dashboard" })}>
-                Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" />
+              <Button
+                size="lg"
+                disabled={transitioning}
+                onClick={async () => {
+                  setTransitioning(true);
+                  try {
+                    await refreshSetupStatus();
+                    setShowBridgeAnimation(true);
+                    setTimeout(() => {
+                      void navigate({ to: "/dashboard" });
+                    }, 3000);
+                  } catch {
+                    toast.error("Failed to complete setup transition. Please try again.");
+                    setTransitioning(false);
+                  }
+                }}
+              >
+                {transitioning && !showBridgeAnimation ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Loading…</>
+                ) : (
+                  <>Go to Dashboard <ArrowRight className="ml-2 h-4 w-4" /></>
+                )}
               </Button>
             </div>
           )}
         </>
       )}
     </div>
+
+    {showBridgeAnimation && <BridgeTransition />}
+    </>
   );
 }

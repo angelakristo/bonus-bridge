@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useEntity } from "@/contexts/EntityContext";
+import { useSetupStatus } from "@/contexts/SetupContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { SetupChecklist } from "@/components/setup/SetupChecklist";
@@ -17,6 +18,7 @@ export const Route = createFileRoute("/_authenticated/_setupLayout")({
 function SetupLayout() {
   const { roles } = useAuth();
   const { entity_id, loading: entityLoading } = useEntity();
+  const { isSetupComplete, loading: setupLoading } = useSetupStatus();
   const location = useLocation();
   const allowed = roles.includes("hr_rep") || roles.includes("ceo");
 
@@ -101,6 +103,12 @@ function SetupLayout() {
         </Card>
       </div>
     );
+  }
+
+  // Once setup is complete, render the page content without the checklist sidebar.
+  // Wait until SetupContext has resolved to avoid a flash of the sidebar.
+  if (!setupLoading && isSetupComplete) {
+    return <Outlet />;
   }
 
   return (

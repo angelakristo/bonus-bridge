@@ -4,18 +4,14 @@ import autoTable from "jspdf-autotable";
 import { Download, Loader2, X } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
-import { cn } from "@/lib/utils";
 import {
   Dialog,
   DialogContent,
   DialogClose,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from "@/components/ui/table";
 import type { KpiCardData } from "@/components/kpi/KpiCard";
+import { KpiTable } from "@/components/kpi/KpiTable";
 import logoUrl from "@/assets/bonusbridge-full.png";
 
 /* ── Types ────────────────────────────────────────────────────────────────── */
@@ -30,28 +26,10 @@ export type Props = {
   year: number;
 };
 
-/* ── Style maps ───────────────────────────────────────────────────────────── */
-
-const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  growth:     { bg: "bg-green-100", text: "text-green-800",  label: "Growth"     },
-  efficiency: { bg: "bg-blue-100",  text: "text-blue-800",   label: "Efficiency" },
-  culture:    { bg: "bg-amber-100", text: "text-amber-800",  label: "Culture"    },
-};
-
-const TYPE_STYLE: Record<string, { label: string; className: string }> = {
-  progressive: { label: "Progressive", className: "bg-violet-100 text-violet-800" },
-  binary:      { label: "Binary",      className: "bg-sky-100 text-sky-800"       },
-  benchmark:   { label: "Benchmark",   className: "bg-orange-100 text-orange-800" },
-};
-
 /* ── Period helpers ───────────────────────────────────────────────────────── */
 
 const PERIODS = ["q1", "q2", "h1", "q3", "q4", "h2", "fullyear"] as const;
 type Period = (typeof PERIODS)[number];
-
-const PERIOD_LABEL: Record<Period, string> = {
-  q1: "Q1", q2: "Q2", h1: "H1", q3: "Q3", q4: "Q4", h2: "H2", fullyear: "FY",
-};
 
 const BINARY_EDITABLE = new Set<Period>(["h1", "fullyear"]);
 
@@ -63,61 +41,10 @@ function periodCell(kpi: KpiCardData, period: Period): string {
     return t.target_binary === true ? "Yes" : t.target_binary === false ? "No" : "—";
   }
   if (!t || t.target_value === null) return "—";
-  return kpi.unit ? `${t.target_value} ${kpi.unit}` : String(t.target_value);
+  return String(t.target_value);
 }
 
 /* ── Data fetchers ────────────────────────────────────────────────────────── */
-
-async function fetchLibrary(entityId: string, year: number): Promise<KpiCardData[]> {
-  const [defRes, corpKpiRes, deptKpiRes, orgDeptRes, funcDeptRes] = await Promise.all([
-    supabase.from("kpi_definitions")
-      .select("id, title, description, driver, kpi_type, unit")
-      .eq("entity_id", entityId).eq("year", year).eq("is_active", true)
-      .order("created_at", { ascending: false }),
-    supabase.from("corporate_kpis")
-      .select("id, kpi_definition_id")
-      .eq("entity_id", entityId).eq("year", year),
-    supabase.from("department_kpis")
-      .select("id, kpi_definition_id, org_department_id, functional_department_id")
-      .eq("entity_id", entityId).eq("year", year),
-    supabase.from("organisational_departments").select("id, name").eq("entity_id", entityId),
-    supabase.from("functions").select("id, name"),
-  ]);
-  if (defRes.error) return [];
-
-  const orgDeptMap  = new Map((orgDeptRes.data  ?? []).map((d) => [d.id, d.name]));
-  const funcDeptMap = new Map((funcDeptRes.data ?? []).map((d) => [d.id, d.name]));
-
-  const corpByDefId = new Map<string, string>();
-  for (const row of corpKpiRes.data ?? []) corpByDefId.set(row.kpi_definition_id, row.id);
-
-  type DeptRow = { kpi_definition_id: string; id: string; org_department_id: string | null; functional_department_id: string | null };
-  const deptByDefId = new Map<string, { kpiId: string; orgDeptId: string | null; funcDeptId: string | null }>();
-  for (const row of (deptKpiRes.data ?? []) as DeptRow[]) {
-    if (!deptByDefId.has(row.kpi_definition_id))
-      deptByDefId.set(row.kpi_definition_id, { kpiId: row.id, orgDeptId: row.org_department_id, funcDeptId: row.functional_department_id });
-  }
-
-  return (defRes.data ?? []).map((d) => {
-    const corpKpiId = corpByDefId.get(d.id);
-    const deptInfo  = deptByDefId.get(d.id);
-    let source_label: "Corporate" | "Department" | null = null;
-    let dept_name: string | null = null;
-    let func_name: string | null = null;
-    if (corpKpiId) {
-      source_label = "Corporate";
-    } else if (deptInfo) {
-      source_label = "Department";
-      dept_name = deptInfo.orgDeptId  ? (orgDeptMap.get(deptInfo.orgDeptId)   ?? null) : null;
-      func_name = deptInfo.funcDeptId ? (funcDeptMap.get(deptInfo.funcDeptId) ?? null) : null;
-    }
-    return {
-      id: d.id, title: d.title, description: d.description ?? null,
-      driver: d.driver as KpiCardData["driver"], kpi_type: d.kpi_type as KpiCardData["kpi_type"], unit: d.unit,
-      yearend_target_value: null, yearend_target_binary: null, source_label, dept_name, func_name,
-    };
-  });
-}
 
 async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCardData[]> {
   const { data, error } = await supabase
@@ -138,37 +65,19 @@ async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCa
     tgtMap.get(t.corporate_kpi_id)![t.period] = { target_value: t.target_value ?? null, target_binary: t.target_binary ?? null };
   }
 
-  return data.flatMap((row) => {
-    const def = row.kpi_definitions as unknown as { id: string; title: string; description: string | null; driver: string; kpi_type: string; unit: string | null } | null;
-    if (!def) return [];
-    const pt = tgtMap.get(row.id) ?? {};
-    return [{
-      id: def.id, board_kpi_id: row.id, title: def.title, description: def.description ?? null,
-      driver: def.driver as KpiCardData["driver"], kpi_type: def.kpi_type as KpiCardData["kpi_type"], unit: def.unit,
-      period_targets: pt,
-      yearend_target_value: pt["fullyear"]?.target_value ?? null,
-      yearend_target_binary: pt["fullyear"]?.target_binary ?? null,
-    }];
-  });
-}
-
-async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: string): Promise<KpiCardData[]> {
-  const { data, error } = await supabase
+  const { data: deptLinks } = await supabase
     .from("department_kpis")
-    .select("id, display_order, kpi_definition_id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
-    .eq("entity_id", entityId).eq("year", year).eq("org_department_id", orgDeptId).order("display_order");
-  if (error || !data?.length) return [];
+    .select("corporate_kpi_id, kpi_definitions(title)")
+    .in("corporate_kpi_id", ids);
 
-  const ids = data.map((r) => r.id);
-  const { data: tgtsData } = await supabase
-    .from("department_kpi_targets")
-    .select("department_kpi_id, period, target_value, target_binary")
-    .in("department_kpi_id", ids);
-
-  const tgtMap = new Map<string, Record<string, { target_value: number | null; target_binary: boolean | null }>>();
-  for (const t of tgtsData ?? []) {
-    if (!tgtMap.has(t.department_kpi_id)) tgtMap.set(t.department_kpi_id, {});
-    tgtMap.get(t.department_kpi_id)![t.period] = { target_value: t.target_value ?? null, target_binary: t.target_binary ?? null };
+  const deptLinksMap = new Map<string, string[]>();
+  for (const dl of deptLinks ?? []) {
+    const cid = (dl as unknown as { corporate_kpi_id: string | null }).corporate_kpi_id;
+    const title = (dl.kpi_definitions as unknown as { title: string } | null)?.title;
+    if (cid && title) {
+      if (!deptLinksMap.has(cid)) deptLinksMap.set(cid, []);
+      deptLinksMap.get(cid)!.push(title);
+    }
   }
 
   return data.flatMap((row) => {
@@ -181,6 +90,55 @@ async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: st
       period_targets: pt,
       yearend_target_value: pt["fullyear"]?.target_value ?? null,
       yearend_target_binary: pt["fullyear"]?.target_binary ?? null,
+      linked_dept_kpi_titles: deptLinksMap.get(row.id) ?? null,
+    }];
+  });
+}
+
+async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: string): Promise<KpiCardData[]> {
+  const { data, error } = await supabase
+    .from("department_kpis")
+    .select("id, display_order, kpi_definition_id, corporate_kpi_id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
+    .eq("entity_id", entityId).eq("year", year).eq("org_department_id", orgDeptId).order("display_order");
+  if (error || !data?.length) return [];
+
+  const ids = data.map((r) => r.id);
+  const corpKpiIds = [...new Set(
+    data.map((r) => (r as unknown as { corporate_kpi_id?: string | null }).corporate_kpi_id).filter(Boolean),
+  )] as string[];
+
+  const [tgtsRes, corpKpiRes] = await Promise.all([
+    supabase.from("department_kpi_targets").select("department_kpi_id, period, target_value, target_binary").in("department_kpi_id", ids),
+    corpKpiIds.length > 0
+      ? supabase.from("corporate_kpis").select("id, kpi_definitions(title)").in("id", corpKpiIds)
+      : Promise.resolve({ data: [] as { id: string; kpi_definitions: unknown }[] }),
+  ]);
+
+  const tgtMap = new Map<string, Record<string, { target_value: number | null; target_binary: boolean | null }>>();
+  for (const t of tgtsRes.data ?? []) {
+    if (!tgtMap.has(t.department_kpi_id)) tgtMap.set(t.department_kpi_id, {});
+    tgtMap.get(t.department_kpi_id)![t.period] = { target_value: t.target_value ?? null, target_binary: t.target_binary ?? null };
+  }
+
+  const corpTitleMap = new Map<string, string>();
+  for (const ck of corpKpiRes.data ?? []) {
+    const title = (ck.kpi_definitions as unknown as { title: string } | null)?.title ?? null;
+    if (title) corpTitleMap.set(ck.id, title);
+  }
+
+  return data.flatMap((row) => {
+    const def = row.kpi_definitions as unknown as { id: string; title: string; description: string | null; driver: string; kpi_type: string; unit: string | null } | null;
+    if (!def) return [];
+    const pt = tgtMap.get(row.id) ?? {};
+    const corpKpiId = (row as unknown as { corporate_kpi_id?: string | null }).corporate_kpi_id;
+    return [{
+      id: def.id, board_kpi_id: row.id, title: def.title, description: def.description ?? null,
+      driver: def.driver as KpiCardData["driver"], kpi_type: def.kpi_type as KpiCardData["kpi_type"], unit: def.unit,
+      period_targets: pt,
+      yearend_target_value: pt["fullyear"]?.target_value ?? null,
+      yearend_target_binary: pt["fullyear"]?.target_binary ?? null,
+      corp_kpi_id:    corpKpiId ?? null,
+      corp_kpi_title: corpKpiId ? (corpTitleMap.get(corpKpiId) ?? null) : null,
     }];
   });
 }
@@ -217,6 +175,24 @@ const BORDER: [number, number, number] = [226, 232, 240];
 const DRIVER_LABEL: Record<string, string> = { growth: "Growth", efficiency: "Efficiency", culture: "Culture" };
 const TYPE_LABEL:   Record<string, string> = { progressive: "Progressive", binary: "Binary", benchmark: "Benchmark" };
 
+// 13 columns matching KpiTable column order: Title, Description, Type, Driver, [Link], Unit, Q1–FY
+// Total width 255 mm — fits within 273 mm usable on A4 landscape (297 mm − 2 × 12 mm margin)
+const BOARD_COL_WIDTHS = {
+  0:  { cellWidth: 38 },  // Title
+  1:  { cellWidth: 46 },  // Description
+  2:  { cellWidth: 22 },  // Type
+  3:  { cellWidth: 22 },  // Driver
+  4:  { cellWidth: 38 },  // Link column (Related KPI / Department KPI / Corporate KPI)
+  5:  { cellWidth: 12 },  // Unit
+  6:  { cellWidth: 11 },  // Q1
+  7:  { cellWidth: 11 },  // Q2
+  8:  { cellWidth: 11 },  // H1
+  9:  { cellWidth: 11 },  // Q3
+  10: { cellWidth: 11 },  // Q4
+  11: { cellWidth: 11 },  // H2
+  12: { cellWidth: 11 },  // FY
+};
+
 async function generatePdf(
   entityName: string | null,
   year: number,
@@ -229,17 +205,15 @@ async function generatePdf(
   const { dataUrl: wmDataUrl, aspectRatio: wmAR } = await loadLogoForWatermark(logoUrl, 0.07);
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const PW   = doc.internal.pageSize.getWidth();   // 297 mm
-  const PH   = doc.internal.pageSize.getHeight();  // 210 mm
-  const M    = 12;                                  // margin
+  const PW = doc.internal.pageSize.getWidth();   // 297 mm
+  const PH = doc.internal.pageSize.getHeight();  // 210 mm
+  const M  = 12;
 
-  // Watermark dimensions — 55% of page width, maintain aspect ratio
   const wmW = PW * 0.55;
   const wmH = wmW / wmAR;
   const wmX = (PW - wmW) / 2;
   const wmY = (PH - wmH) / 2;
 
-  // Track which pages have received the watermark to avoid duplicates
   const watermarkedPages = new Set<number>();
 
   function stampWatermark() {
@@ -250,10 +224,10 @@ async function generatePdf(
     doc.addImage(wmDataUrl, "PNG", wmX, wmY, wmW, wmH);
   }
 
-  function drawRunningHeader(sectionTitle: string) {
+  function drawRunningHeader(section: string) {
     doc.setFontSize(7);
     doc.setTextColor(...MUTED);
-    doc.text(`${entityName ?? "BonusBridge"}  ·  KPI Board Report  ·  ${year}  |  ${sectionTitle}`, M, 7);
+    doc.text(`${entityName ?? "BonusBridge"}  ·  KPI Board Report  ·  ${year}  |  ${section}`, M, 7);
     const pg = (doc.internal as unknown as { getCurrentPageInfo: () => { pageNumber: number } })
       .getCurrentPageInfo().pageNumber;
     doc.text(`Page ${pg}  ·  Confidential`, PW - M, 7, { align: "right" });
@@ -266,6 +240,13 @@ async function generatePdf(
     doc.setTextColor(...NAVY);
     doc.text(text, M, y);
     doc.setFont("helvetica", "normal");
+    doc.setTextColor(0, 0, 0);
+  }
+
+  function emptyNote(y: number) {
+    doc.setFontSize(8);
+    doc.setTextColor(...MUTED);
+    doc.text("No KPIs added yet.", M, y);
     doc.setTextColor(0, 0, 0);
   }
 
@@ -293,7 +274,6 @@ async function generatePdf(
 
   stampWatermark();
 
-  // Cover block
   doc.setFontSize(22);
   doc.setFont("helvetica", "bold");
   doc.setTextColor(...NAVY);
@@ -310,35 +290,30 @@ async function generatePdf(
 
   sectionTitle("KPI Library", 36);
 
-  autoTable(doc, {
-    ...baseTable,
-    head: [["Title", "Description", "Driver", "Type", "Unit", "Linked To"]],
-    body: library.map((kpi) => [
-      kpi.title,
-      kpi.description ?? "—",
-      DRIVER_LABEL[kpi.driver] ?? kpi.driver,
-      TYPE_LABEL[kpi.kpi_type] ?? kpi.kpi_type,
-      kpi.unit ?? "—",
-      kpi.source_label === "Corporate"
-        ? "Corporate"
-        : kpi.source_label === "Department"
-          ? [kpi.dept_name, kpi.func_name].filter(Boolean).join(" / ") || "Department"
-          : "—",
-    ]),
-    startY: 40,
-    columnStyles: {
-      0: { cellWidth: 50 },
-      1: { cellWidth: 70 },
-      2: { cellWidth: 24 },
-      3: { cellWidth: 25 },
-      4: { cellWidth: 16 },
-      5: { cellWidth: 52 },
-    },
-    willDrawPage: (data) => {
-      if (data.pageNumber > 1) stampWatermark();
-    },
-    didDrawPage: () => drawRunningHeader("KPI Library"),
-  });
+  if (library.length === 0) {
+    emptyNote(43);
+    drawRunningHeader("KPI Library");
+  } else {
+    autoTable(doc, {
+      ...baseTable,
+      head: [["Title", "Description", "Type", "Driver", "Related KPI", "Unit", "Q1", "Q2", "H1", "Q3", "Q4", "H2", "FY"]],
+      body: library.map((kpi) => [
+        kpi.title,
+        kpi.description ?? "—",
+        TYPE_LABEL[kpi.kpi_type] ?? kpi.kpi_type,
+        DRIVER_LABEL[kpi.driver] ?? kpi.driver,
+        kpi.linked_dept_kpi_titles?.length
+          ? kpi.linked_dept_kpi_titles.join(", ")
+          : kpi.corp_kpi_title ?? "—",
+        kpi.unit ?? "—",
+        ...PERIODS.map((p) => periodCell(kpi, p)),
+      ]),
+      startY: 40,
+      columnStyles: BOARD_COL_WIDTHS,
+      willDrawPage: (data) => { if (data.pageNumber > 1) stampWatermark(); },
+      didDrawPage: () => drawRunningHeader("KPI Library"),
+    });
+  }
 
   // ── PAGE: Corporate KPIs ──────────────────────────────────────────────────
 
@@ -346,86 +321,67 @@ async function generatePdf(
   stampWatermark();
   sectionTitle("Corporate KPIs", 16);
 
-  autoTable(doc, {
-    ...baseTable,
-    head: [["Title", "Description", "Driver", "Type", "Unit", "Q1", "Q2", "H1", "Q3", "Q4", "H2", "FY"]],
-    body: corpKpis.map((kpi) => [
-      kpi.title,
-      kpi.description ?? "—",
-      DRIVER_LABEL[kpi.driver] ?? kpi.driver,
-      TYPE_LABEL[kpi.kpi_type] ?? kpi.kpi_type,
-      kpi.unit ?? "—",
-      ...PERIODS.map((p) => periodCell(kpi, p)),
-    ]),
-    startY: 20,
-    columnStyles: {
-      0: { cellWidth: 44 },
-      1: { cellWidth: 58 },
-      2: { cellWidth: 22 },
-      3: { cellWidth: 22 },
-      4: { cellWidth: 14 },
-      5:  { cellWidth: 12 },
-      6:  { cellWidth: 12 },
-      7:  { cellWidth: 12 },
-      8:  { cellWidth: 12 },
-      9:  { cellWidth: 12 },
-      10: { cellWidth: 12 },
-      11: { cellWidth: 13 },
-    },
-    willDrawPage: (data) => {
-      if (data.pageNumber > 1) stampWatermark();
-    },
-    didDrawPage: () => drawRunningHeader("Corporate KPIs"),
-  });
+  if (corpKpis.length === 0) {
+    emptyNote(23);
+    drawRunningHeader("Corporate KPIs");
+  } else {
+    autoTable(doc, {
+      ...baseTable,
+      head: [["Title", "Description", "Type", "Driver", "Department KPI", "Unit", "Q1", "Q2", "H1", "Q3", "Q4", "H2", "FY"]],
+      body: corpKpis.map((kpi) => [
+        kpi.title,
+        kpi.description ?? "—",
+        TYPE_LABEL[kpi.kpi_type] ?? kpi.kpi_type,
+        DRIVER_LABEL[kpi.driver] ?? kpi.driver,
+        kpi.linked_dept_kpi_titles?.length ? kpi.linked_dept_kpi_titles.join(", ") : "—",
+        kpi.unit ?? "—",
+        ...PERIODS.map((p) => periodCell(kpi, p)),
+      ]),
+      startY: 20,
+      columnStyles: BOARD_COL_WIDTHS,
+      willDrawPage: (data) => { if (data.pageNumber > 1) stampWatermark(); },
+      didDrawPage: () => drawRunningHeader("Corporate KPIs"),
+    });
+  }
 
   // ── PAGES: One per department ─────────────────────────────────────────────
 
   for (const dept of orgDepts) {
     const kpis = deptMap[dept.id] ?? [];
-    if (kpis.length === 0) continue;
 
     doc.addPage();
     stampWatermark();
     sectionTitle(`${dept.name} — Department KPIs`, 16);
 
-    autoTable(doc, {
-      ...baseTable,
-      head: [["Title", "Description", "Driver", "Type", "Unit", "Q1", "Q2", "H1", "Q3", "Q4", "H2", "FY"]],
-      body: kpis.map((kpi) => [
-        kpi.title,
-        kpi.description ?? "—",
-        DRIVER_LABEL[kpi.driver] ?? kpi.driver,
-        TYPE_LABEL[kpi.kpi_type] ?? kpi.kpi_type,
-        kpi.unit ?? "—",
-        ...PERIODS.map((p) => periodCell(kpi, p)),
-      ]),
-      startY: 20,
-      columnStyles: {
-        0: { cellWidth: 44 },
-        1: { cellWidth: 58 },
-        2: { cellWidth: 22 },
-        3: { cellWidth: 22 },
-        4: { cellWidth: 14 },
-        5:  { cellWidth: 12 },
-        6:  { cellWidth: 12 },
-        7:  { cellWidth: 12 },
-        8:  { cellWidth: 12 },
-        9:  { cellWidth: 12 },
-        10: { cellWidth: 12 },
-        11: { cellWidth: 13 },
-      },
-      willDrawPage: (data) => {
-        if (data.pageNumber > 1) stampWatermark();
-      },
-      didDrawPage: () => drawRunningHeader(dept.name),
-    });
+    if (kpis.length === 0) {
+      emptyNote(23);
+      drawRunningHeader(dept.name);
+    } else {
+      autoTable(doc, {
+        ...baseTable,
+        head: [["Title", "Description", "Type", "Driver", "Corporate KPI", "Unit", "Q1", "Q2", "H1", "Q3", "Q4", "H2", "FY"]],
+        body: kpis.map((kpi) => [
+          kpi.title,
+          kpi.description ?? "—",
+          TYPE_LABEL[kpi.kpi_type] ?? kpi.kpi_type,
+          DRIVER_LABEL[kpi.driver] ?? kpi.driver,
+          kpi.corp_kpi_title ?? "—",
+          kpi.unit ?? "—",
+          ...PERIODS.map((p) => periodCell(kpi, p)),
+        ]),
+        startY: 20,
+        columnStyles: BOARD_COL_WIDTHS,
+        willDrawPage: (data) => { if (data.pageNumber > 1) stampWatermark(); },
+        didDrawPage: () => drawRunningHeader(dept.name),
+      });
+    }
   }
 
   const filename = `${(entityName ?? "BonusBridge").replace(/\s+/g, "-")}-KPI-Board-${year}.pdf`;
   doc.save(filename);
 }
 
-/* ── In-app preview sub-components ───────────────────────────────────────── */
+/* ── Preview section wrapper ──────────────────────────────────────────────── */
 
 function PreviewSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -436,95 +392,15 @@ function PreviewSection({ title, children }: { title: string; children: React.Re
   );
 }
 
-function PreviewTable({
-  kpis,
-  variant,
-}: {
-  kpis: KpiCardData[];
-  variant: "library" | "board";
-}) {
-  if (kpis.length === 0) {
-    return (
-      <p className="text-sm text-muted-foreground py-3 text-center border rounded-md">
-        No KPIs configured.
-      </p>
-    );
-  }
-
-  return (
-    <div className="rounded-md border overflow-x-auto">
-      <Table className="table-fixed min-w-[580px]">
-        <TableHeader>
-          <TableRow className="bg-muted/40">
-            <TableHead className="w-36 text-xs">Title</TableHead>
-            <TableHead className="w-24 text-xs">Driver</TableHead>
-            <TableHead className="w-24 text-xs">Type</TableHead>
-            <TableHead className="w-16 text-xs">Unit</TableHead>
-            {variant === "library" ? (
-              <TableHead className="text-xs">Linked To</TableHead>
-            ) : (
-              PERIODS.map((p) => (
-                <TableHead key={p} className="w-10 text-xs text-right">{PERIOD_LABEL[p]}</TableHead>
-              ))
-            )}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {kpis.map((kpi) => {
-            const ds = DRIVER_STYLE[kpi.driver] ?? DRIVER_STYLE.growth;
-            const ts = TYPE_STYLE[kpi.kpi_type] ?? TYPE_STYLE.progressive;
-            return (
-              <TableRow key={kpi.id}>
-                <TableCell className="text-sm font-medium align-top">
-                  <span className="block break-words whitespace-normal">{kpi.title}</span>
-                  {kpi.description && (
-                    <span className="block text-xs text-muted-foreground mt-0.5 whitespace-normal">{kpi.description}</span>
-                  )}
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge variant="outline" className={cn("border-0 text-xs font-medium", ds.bg, ds.text)}>
-                    {ds.label}
-                  </Badge>
-                </TableCell>
-                <TableCell className="align-top">
-                  <Badge variant="outline" className={cn("border-0 text-xs font-medium", ts.className)}>
-                    {ts.label}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-xs text-muted-foreground align-top">{kpi.unit ?? "—"}</TableCell>
-                {variant === "library" ? (
-                  <TableCell className="text-xs text-muted-foreground align-top">
-                    {kpi.source_label === "Corporate"
-                      ? "Corporate"
-                      : kpi.source_label === "Department"
-                        ? [kpi.dept_name, kpi.func_name].filter(Boolean).join(" / ") || "Department"
-                        : "—"}
-                  </TableCell>
-                ) : (
-                  PERIODS.map((p) => (
-                    <TableCell key={p} className="text-right text-xs tabular-nums align-top text-muted-foreground">
-                      {periodCell(kpi, p)}
-                    </TableCell>
-                  ))
-                )}
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
-    </div>
-  );
-}
-
 /* ── Main modal ───────────────────────────────────────────────────────────── */
 
 export function CeoReportModal({ open, onOpenChange, entityId, entityName, year }: Props) {
-  const [loading,      setLoading]      = useState(false);
-  const [generating,   setGenerating]   = useState(false);
-  const [library,      setLibrary]      = useState<KpiCardData[]>([]);
-  const [corpKpis,     setCorpKpis]     = useState<KpiCardData[]>([]);
-  const [orgDepts,     setOrgDepts]     = useState<OrgDept[]>([]);
-  const [deptMap,      setDeptMap]      = useState<Record<string, KpiCardData[]>>({});
+  const [loading,    setLoading]    = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [library,    setLibrary]    = useState<KpiCardData[]>([]);
+  const [corpKpis,   setCorpKpis]   = useState<KpiCardData[]>([]);
+  const [orgDepts,   setOrgDepts]   = useState<OrgDept[]>([]);
+  const [deptMap,    setDeptMap]    = useState<Record<string, KpiCardData[]>>({});
 
   const generatedDate = new Date().toLocaleDateString("en-GB", {
     day: "numeric", month: "long", year: "numeric",
@@ -547,16 +423,15 @@ export function CeoReportModal({ open, onOpenChange, entityId, entityName, year 
       const deptList = (deptsData ?? []) as OrgDept[];
       setOrgDepts(deptList);
 
-      const [lib, corp, ...deptResults] = await Promise.all([
-        fetchLibrary(entityId!, year),
+      const [corp, ...deptResults] = await Promise.all([
         fetchCorporateKpis(entityId!, year),
         ...deptList.map((d) => fetchDepartmentKpis(entityId!, year, d.id)),
       ]);
-      setLibrary(lib);
       setCorpKpis(corp);
       const dm: Record<string, KpiCardData[]> = {};
       deptList.forEach((d, i) => { dm[d.id] = deptResults[i]; });
       setDeptMap(dm);
+      setLibrary([...corp, ...deptResults.flat()]);
     } finally {
       setLoading(false);
     }
@@ -639,20 +514,20 @@ export function CeoReportModal({ open, onOpenChange, entityId, entityName, year 
                 ))}
               </div>
 
-              {/* KPI Library */}
+              {/* KPI Library — rendered with the same KpiTable used on /kpi-board */}
               <PreviewSection title={`KPI Library (${library.length})`}>
-                <PreviewTable kpis={library} variant="library" />
+                <KpiTable kpis={library} variant="library" />
               </PreviewSection>
 
               {/* Corporate KPIs */}
               <PreviewSection title={`Corporate KPIs (${corpKpis.length})`}>
-                <PreviewTable kpis={corpKpis} variant="board" />
+                <KpiTable kpis={corpKpis} variant="corporate" />
               </PreviewSection>
 
-              {/* Departments */}
+              {/* One section per department — all departments shown, empty state handled by KpiTable */}
               {orgDepts.map((dept) => (
                 <PreviewSection key={dept.id} title={`${dept.name} — Department KPIs (${(deptMap[dept.id] ?? []).length})`}>
-                  <PreviewTable kpis={deptMap[dept.id] ?? []} variant="board" />
+                  <KpiTable kpis={deptMap[dept.id] ?? []} variant="department" />
                 </PreviewSection>
               ))}
 

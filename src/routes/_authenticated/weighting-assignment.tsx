@@ -446,7 +446,7 @@ function WeightKpiTable({
                 {/* Period targets */}
                 {PERIODS.map((p) => {
                   if (isEditMode && variant === "individual") {
-                    const isBinary = editRow.kpi_type === "binary";
+                    const isBinary = editRow.scoring_type === "binary" || (editRow.scoring_type == null && editRow.kpi_type === "binary");
                     const isDerived = DERIVED_PERIODS.has(p);
 
                     if (isBinary) {
@@ -510,7 +510,7 @@ function WeightKpiTable({
                     <TableCell key={p} className="text-right text-xs tabular-nums align-top">
                       {DERIVED_PERIODS.has(p) ? (
                         <span className="italic text-muted-foreground">
-                          {kpi.kpi_type === "binary"
+                          {(kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary"))
                             ? (BINARY_EDITABLE.has(p) ? periodCell(kpi, p) : "—")
                             : (() => {
                                 const v = computeDerived(kpi.period_targets, p as "h1" | "h2" | "fullyear");
@@ -1088,7 +1088,7 @@ function WeightingAssignmentPage() {
         .maybeSingle(),
       supabase
         .from("corporate_kpis")
-        .select("id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
+        .select("id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
         .eq("entity_id", entity_id).eq("year", selected_year),
       supabase
         .from("people_org_departments").select("org_department_id").eq("person_id", selectedPersonId),
@@ -1096,7 +1096,7 @@ function WeightingAssignmentPage() {
         .from("people_functional_departments").select("functional_department_id").eq("person_id", selectedPersonId),
       supabase
         .from("individual_kpis")
-        .select("id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
+        .select("id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
         .eq("entity_id", entity_id).eq("person_id", selectedPersonId)
         .eq("year", selected_year).eq("is_active", true).eq("status", "approved"),
       supabase
@@ -1132,7 +1132,7 @@ function WeightingAssignmentPage() {
         : Promise.resolve({ data: [] as { corporate_kpi_id: string; period: string; target_value: number | null; target_binary: boolean | null }[] }),
       (orgDeptIds.length > 0 || funcDeptIds.length > 0)
         ? supabase.from("department_kpis")
-            .select("id, org_department_id, functional_department_id, corporate_kpi_id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
+            .select("id, org_department_id, functional_department_id, corporate_kpi_id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
             .eq("entity_id", entity_id).eq("year", selected_year)
         : Promise.resolve({ data: [] as unknown[] }),
       indIds.length > 0
@@ -1220,18 +1220,25 @@ function WeightingAssignmentPage() {
       const def = raw.kpi_definitions as {
         id: string; title: string; description: string | null;
         driver: string; kpi_type: string; unit: string | null;
+        period_agg_type: string | null; scoring_type: string | null; input_mode: string | null;
       } | null;
       const pt = tgtMap.get(raw.id) ?? {};
       return {
-        id:                   def?.id ?? raw.id,
-        board_kpi_id:         raw.id,
-        title:                def?.title       ?? "Untitled",
-        description:          def?.description ?? null,
-        driver:               (def?.driver     ?? "growth")      as WeightKpiRow["driver"],
-        kpi_type:             (def?.kpi_type   ?? "progressive") as WeightKpiRow["kpi_type"],
-        unit:                 def?.unit ?? null,
-        period_targets:       pt,
-        yearend_target_value: pt["fullyear"]?.target_value  ?? null,
+        id:                    def?.id ?? raw.id,
+        board_kpi_id:          raw.id,
+        title:                 def?.title       ?? "Untitled",
+        description:           def?.description ?? null,
+        driver:                (def?.driver     ?? "growth")      as WeightKpiRow["driver"],
+        kpi_type:              (def?.kpi_type   ?? "progressive") as WeightKpiRow["kpi_type"],
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        period_agg_type:       (def?.period_agg_type  ?? null) as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        scoring_type:          (def?.scoring_type     ?? null) as any,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        input_mode:            (def?.input_mode       ?? null) as any,
+        unit:                  def?.unit ?? null,
+        period_targets:        pt,
+        yearend_target_value:  pt["fullyear"]?.target_value  ?? null,
         yearend_target_binary: pt["fullyear"]?.target_binary ?? null,
         ...extra,
       };

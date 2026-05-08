@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import type { PeriodAggType, ScoringType, InputMode } from "@/lib/kpi-engine";
+import { PERIOD_AGG_META, SCORING_TYPE_META } from "@/lib/kpi-engine";
 
 export type PeriodTarget = { target_value: number | null; target_binary: boolean | null };
 
@@ -15,6 +17,10 @@ export type KpiCardData = {
   description?: string | null;
   driver: "growth" | "efficiency" | "culture";
   kpi_type: "progressive" | "binary" | "benchmark";
+  /** New calculation-model fields — nullable until migration back-fills legacy rows */
+  period_agg_type?: PeriodAggType | null;
+  scoring_type?: ScoringType | null;
+  input_mode?: InputMode | null;
   unit: string | null;
   /** All period targets keyed by period string (q1, q2, h1, q3, q4, h2, fullyear). */
   period_targets?: Record<string, PeriodTarget>;
@@ -39,11 +45,23 @@ const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> 
   culture:    { bg: "bg-amber-100", text: "text-amber-800",  label: "Culture"    },
 };
 
-const TYPE_LABEL: Record<string, string> = {
+const LEGACY_TYPE_LABEL: Record<string, string> = {
   progressive: "Progressive",
   binary:      "Binary",
   benchmark:   "Benchmark",
 };
+
+/** Returns a short badge label: new model when available, legacy fallback otherwise. */
+function getTypeLabel(kpi: KpiCardData): string {
+  if (kpi.period_agg_type) return PERIOD_AGG_META[kpi.period_agg_type].shortLabel;
+  return LEGACY_TYPE_LABEL[kpi.kpi_type] ?? "—";
+}
+
+/** Secondary scoring label — shown only when new model is present and non-obvious. */
+function getScoringLabel(kpi: KpiCardData): string | null {
+  if (!kpi.scoring_type) return null;
+  return SCORING_TYPE_META[kpi.scoring_type].label;
+}
 
 export type KpiCardSource = "library" | "corporate" | "department";
 
@@ -56,7 +74,7 @@ type Props = {
 
 export function KpiCard({ kpi, canEdit, onEdit, onDelete }: Props) {
   const ds = DRIVER_STYLE[kpi.driver] ?? DRIVER_STYLE.growth;
-  const isBinary = kpi.kpi_type === "binary";
+  const isBinary = kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
 
   let targetDisplay: string;
   if (isBinary) {
@@ -106,8 +124,13 @@ export function KpiCard({ kpi, canEdit, onEdit, onDelete }: Props) {
             {ds.label}
           </Badge>
           <Badge variant="secondary" className="text-xs">
-            {TYPE_LABEL[kpi.kpi_type]}
+            {getTypeLabel(kpi)}
           </Badge>
+          {getScoringLabel(kpi) && (
+            <Badge variant="outline" className="text-xs text-muted-foreground">
+              {getScoringLabel(kpi)}
+            </Badge>
+          )}
           {kpi.source_label && (
             <Badge variant="outline" className="text-xs">
               {kpi.source_label === "Department" && kpi.dept_name

@@ -35,7 +35,8 @@ const BINARY_EDITABLE = new Set<Period>(["h1", "fullyear"]);
 
 function periodCell(kpi: KpiCardData, period: Period): string {
   const t = kpi.period_targets?.[period];
-  if (kpi.kpi_type === "binary") {
+  const isBinary = kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
+  if (isBinary) {
     if (!BINARY_EDITABLE.has(period)) return "—";
     if (!t) return "—";
     return t.target_binary === true ? "Yes" : t.target_binary === false ? "No" : "—";

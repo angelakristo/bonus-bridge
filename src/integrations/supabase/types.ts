@@ -792,8 +792,11 @@ export type Database = {
           driver: Database["public"]["Enums"]["driver"]
           entity_id: string
           id: string
+          input_mode: Database["public"]["Enums"]["kpi_input_mode"] | null
           is_active: boolean
           kpi_type: Database["public"]["Enums"]["kpi_type"]
+          period_agg_type: Database["public"]["Enums"]["period_aggregation_type"] | null
+          scoring_type: Database["public"]["Enums"]["scoring_type"] | null
           title: string
           unit: string | null
           year: number
@@ -805,8 +808,11 @@ export type Database = {
           driver: Database["public"]["Enums"]["driver"]
           entity_id: string
           id?: string
+          input_mode?: Database["public"]["Enums"]["kpi_input_mode"] | null
           is_active?: boolean
           kpi_type: Database["public"]["Enums"]["kpi_type"]
+          period_agg_type?: Database["public"]["Enums"]["period_aggregation_type"] | null
+          scoring_type?: Database["public"]["Enums"]["scoring_type"] | null
           title: string
           unit?: string | null
           year: number
@@ -818,8 +824,11 @@ export type Database = {
           driver?: Database["public"]["Enums"]["driver"]
           entity_id?: string
           id?: string
+          input_mode?: Database["public"]["Enums"]["kpi_input_mode"] | null
           is_active?: boolean
           kpi_type?: Database["public"]["Enums"]["kpi_type"]
+          period_agg_type?: Database["public"]["Enums"]["period_aggregation_type"] | null
+          scoring_type?: Database["public"]["Enums"]["scoring_type"] | null
           title?: string
           unit?: string | null
           year?: number
@@ -1174,12 +1183,15 @@ export type Database = {
           corporate_target_value: number | null
           driver: Database["public"]["Enums"]["driver"] | null
           entity_id: string | null
+          input_mode: Database["public"]["Enums"]["kpi_input_mode"] | null
           kpi_definition_id: string | null
           kpi_level: Database["public"]["Enums"]["kpi_level"] | null
           kpi_title: string | null
           kpi_type: Database["public"]["Enums"]["kpi_type"] | null
           period: Database["public"]["Enums"]["period"] | null
+          period_agg_type: Database["public"]["Enums"]["period_aggregation_type"] | null
           person_id: string | null
+          scoring_type: Database["public"]["Enums"]["scoring_type"] | null
           unit: string | null
           uploaded_at: string | null
           year: number | null
@@ -1269,10 +1281,30 @@ export type Database = {
     }
     Enums: {
       driver: "growth" | "efficiency" | "culture"
+      kpi_input_mode:
+        | "periodic"
+        | "cumulative_to_date"
+        | "period_end_snapshot"
+        | "component_based"
+        | "manual_aggregate"
       kpi_level: "corporate" | "department" | "individual"
       kpi_status: "draft" | "pending_approval" | "approved" | "rejected"
       kpi_type: "progressive" | "binary" | "benchmark"
       period: "q1" | "q2" | "q3" | "q4" | "h1" | "h2" | "halfyear" | "fullyear"
+      period_aggregation_type:
+        | "additive_flow"
+        | "snapshot_stock"
+        | "weighted_average"
+        | "ratio"
+        | "derived_formula"
+        | "milestone_state"
+        | "composite_index"
+      scoring_type:
+        | "higher_is_better"
+        | "lower_is_better"
+        | "target_range"
+        | "threshold_tiered"
+        | "binary"
       setup_step_status: "not_started" | "in_progress" | "complete"
       upload_status: "processing" | "success" | "failed"
       upload_type: "employees" | "actuals"

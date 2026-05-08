@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PERIOD_AGG_META, type PeriodAggType } from "@/lib/kpi-engine";
 
 export type IndividualKpiDetail = {
   individual_kpi_id: string;
@@ -18,6 +19,8 @@ export type IndividualKpiDetail = {
   description: string | null;
   driver: "growth" | "efficiency" | "culture";
   kpi_type: "progressive" | "binary" | "benchmark";
+  period_agg_type?: PeriodAggType | null;
+  scoring_type?: "higher_is_better" | "lower_is_better" | "target_range" | "threshold_tiered" | "binary" | null;
   unit: string | null;
   status: "draft" | "pending_approval" | "approved" | "rejected";
   approval_note: string | null;
@@ -85,7 +88,7 @@ export function KpiDetailModal({ open, onOpenChange, kpi }: Props) {
   if (!kpi) return null;
 
   const ds = DRIVER_STYLE[kpi.driver];
-  const isBinary = kpi.kpi_type === "binary";
+  const isBinary = kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
   const targetByPeriod = new Map(targets.map((t) => [t.period, t]));
 
   // For binary KPIs show h1 (or legacy halfyear) and fullyear only.
@@ -108,7 +111,11 @@ export function KpiDetailModal({ open, onOpenChange, kpi }: Props) {
             <Badge variant="outline" className={cn("border-0", ds.bg, ds.text)}>
               {ds.label}
             </Badge>
-            <Badge variant="secondary">{TYPE_LABEL[kpi.kpi_type]}</Badge>
+            <Badge variant="secondary">
+              {kpi.period_agg_type
+                ? PERIOD_AGG_META[kpi.period_agg_type].shortLabel
+                : TYPE_LABEL[kpi.kpi_type]}
+            </Badge>
             {kpi.unit && <Badge variant="outline">Unit: {kpi.unit}</Badge>}
           </DialogDescription>
         </DialogHeader>

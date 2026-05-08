@@ -21,6 +21,13 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import type { KpiCardData } from "@/components/kpi/KpiCard";
+import {
+  deriveSinglePeriod,
+  isDerivedPeriod,
+  PERIOD_AGG_META,
+  SCORING_TYPE_META,
+  DERIVED_PERIODS as ENGINE_DERIVED_PERIODS,
+} from "@/lib/kpi-engine";
 
 export type KpiTableVariant = "library" | "corporate" | "department";
 
@@ -47,11 +54,23 @@ const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> 
   culture:    { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-800 dark:text-amber-300", label: "Culture"    },
 };
 
-const TYPE_STYLE: Record<string, { label: string; className: string }> = {
+const LEGACY_TYPE_STYLE: Record<string, { label: string; className: string }> = {
   progressive: { label: "Progressive", className: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300" },
   binary:      { label: "Binary",      className: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"             },
   benchmark:   { label: "Benchmark",   className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
 };
+
+/** Return badge label + className for the type column, preferring new model. */
+function getTypeBadge(kpi: KpiCardData): { label: string; className: string; scoringLabel?: string } {
+  if (kpi.period_agg_type) {
+    return {
+      label: PERIOD_AGG_META[kpi.period_agg_type].shortLabel,
+      className: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
+      scoringLabel: kpi.scoring_type ? SCORING_TYPE_META[kpi.scoring_type].label : undefined,
+    };
+  }
+  return LEGACY_TYPE_STYLE[kpi.kpi_type] ?? LEGACY_TYPE_STYLE.progressive;
+}
 
 const LINK_COL_LABEL: Record<KpiTableVariant, string> = {
   library:    "Related KPI",
@@ -68,35 +87,23 @@ const PERIOD_LABEL: Record<Period, string> = {
   q1: "Q1", q2: "Q2", h1: "H1", q3: "Q3", q4: "Q4", h2: "H2", fullyear: "FY",
 };
 
-const DERIVED_PERIODS = new Set<Period>(["h1", "h2", "fullyear"]);
 const BINARY_EDITABLE = new Set<Period>(["h1", "fullyear"]);
 
 /* ── Helpers ── */
 
+function isBinaryKpi(kpi: KpiCardData): boolean {
+  return kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
+}
+
 function periodCell(kpi: KpiCardData, period: Period): string {
   const t = kpi.period_targets?.[period];
-  if (kpi.kpi_type === "binary") {
+  if (isBinaryKpi(kpi)) {
     if (!BINARY_EDITABLE.has(period)) return "—";
     if (!t) return "—";
     return t.target_binary === true ? "✓" : t.target_binary === false ? "✗" : "—";
   }
   if (!t || t.target_value === null) return "—";
   return String(t.target_value);
-}
-
-function computeDerived(
-  pt: Record<string, { target_value: number | null; target_binary: boolean | null }> | undefined,
-  p: "h1" | "h2" | "fullyear",
-): number | null {
-  const q1 = pt?.["q1"]?.target_value ?? null;
-  const q2 = pt?.["q2"]?.target_value ?? null;
-  const q3 = pt?.["q3"]?.target_value ?? null;
-  const q4 = pt?.["q4"]?.target_value ?? null;
-  const h1 = q1 !== null && q2 !== null ? q1 + q2 : null;
-  const h2 = q3 !== null && q4 !== null ? q3 + q4 : null;
-  if (p === "h1") return h1;
-  if (p === "h2") return h2;
-  return h1 !== null && h2 !== null ? h1 + h2 : null;
 }
 
 const UNIT_OPTS = ["", "%", "EUR", "EUR M", "Count", "Score"] as const;
@@ -146,7 +153,7 @@ export function KpiTable({
             {showTargets && PERIODS.map((p) => (
               <TableHead key={p} className="w-14 text-right">
                 {PERIOD_LABEL[p]}
-                {isEditMode && !DERIVED_PERIODS.has(p) && (
+                {isEditMode && !ENGINE_DERIVED_PERIODS.has(p) && (
                   <span className="ml-0.5 text-[9px] text-blue-500">✎</span>
                 )}
               </TableHead>
@@ -159,8 +166,8 @@ export function KpiTable({
             const row: KpiCardData = (isEditMode ? editingRows?.[kpi.id] : undefined) ?? kpi;
             const isSelected = !!(isDeleteMode && selectedForDelete?.has(kpi.id));
             const ds = DRIVER_STYLE[row.driver] ?? DRIVER_STYLE.growth;
-            const ts = TYPE_STYLE[row.kpi_type] ?? TYPE_STYLE.progressive;
-            const isBinary = row.kpi_type === "binary";
+            const tb = getTypeBadge(row);
+            const isBinary = isBinaryKpi(row);
 
             const change = (updates: Partial<KpiCardData>) =>
               onRowChange?.(kpi.id, { ...row, ...updates } as KpiCardData);
@@ -234,9 +241,14 @@ export function KpiTable({
                       </SelectContent>
                     </Select>
                   ) : (
-                    <Badge variant="outline" className={cn("border-0 text-xs font-medium", ts.className)}>
-                      {ts.label}
-                    </Badge>
+                    <div className="flex flex-col gap-0.5">
+                      <Badge variant="outline" className={cn("border-0 text-xs font-medium", tb.className)}>
+                        {tb.label}
+                      </Badge>
+                      {tb.scoringLabel && (
+                        <span className="text-[10px] text-muted-foreground leading-tight">{tb.scoringLabel}</span>
+                      )}
+                    </div>
                   )}
                 </TableCell>
 
@@ -350,7 +362,7 @@ export function KpiTable({
                     {isEditMode ? (
                       (() => {
                         if (isBinary) {
-                          if (!BINARY_EDITABLE.has(p)) {
+                          if (!BINARY_EDITABLE.has(p as Period)) {
                             return <span className="text-muted-foreground">—</span>;
                           }
                           const val = row.period_targets?.[p]?.target_binary;
@@ -370,8 +382,8 @@ export function KpiTable({
                             </Select>
                           );
                         }
-                        if (DERIVED_PERIODS.has(p)) {
-                          const derived = computeDerived(row.period_targets, p as "h1" | "h2" | "fullyear");
+                        if (isDerivedPeriod(p as Period, row.period_agg_type ?? null)) {
+                          const derived = deriveSinglePeriod(row.period_targets ?? {}, p as "h1" | "h2" | "fullyear", row.period_agg_type ?? null);
                           return (
                             <span className="text-xs tabular-nums text-muted-foreground italic">
                               {derived !== null ? derived : "—"}

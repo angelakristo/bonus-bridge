@@ -20,7 +20,6 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as MasterIndexRouteImport } from './routes/master/index'
 import { Route as MasterNewProjectRouteImport } from './routes/master/new-project'
 import { Route as AuthenticatedWeightingAssignmentRouteImport } from './routes/_authenticated/weighting-assignment'
-import { Route as AuthenticatedUploadHistoryRouteImport } from './routes/_authenticated/upload-history'
 import { Route as AuthenticatedSetupRouteImport } from './routes/_authenticated/setup'
 import { Route as AuthenticatedKpiBoardRouteImport } from './routes/_authenticated/kpi-board'
 import { Route as AuthenticatedKpiApprovalsRouteImport } from './routes/_authenticated/kpi-approvals'
@@ -92,12 +91,6 @@ const AuthenticatedWeightingAssignmentRoute =
   AuthenticatedWeightingAssignmentRouteImport.update({
     id: '/weighting-assignment',
     path: '/weighting-assignment',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedUploadHistoryRoute =
-  AuthenticatedUploadHistoryRouteImport.update({
-    id: '/upload-history',
-    path: '/upload-history',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedSetupRoute = AuthenticatedSetupRouteImport.update({
@@ -215,7 +208,6 @@ export interface FileRoutesByFullPath {
   '/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
-  '/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/master/new-project': typeof MasterNewProjectRoute
   '/master/': typeof MasterIndexRoute
@@ -243,7 +235,6 @@ export interface FileRoutesByTo {
   '/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/setup': typeof AuthenticatedSetupRoute
-  '/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/master/new-project': typeof MasterNewProjectRoute
   '/master': typeof MasterIndexRoute
@@ -275,7 +266,6 @@ export interface FileRoutesById {
   '/_authenticated/kpi-approvals': typeof AuthenticatedKpiApprovalsRoute
   '/_authenticated/kpi-board': typeof AuthenticatedKpiBoardRoute
   '/_authenticated/setup': typeof AuthenticatedSetupRoute
-  '/_authenticated/upload-history': typeof AuthenticatedUploadHistoryRoute
   '/_authenticated/weighting-assignment': typeof AuthenticatedWeightingAssignmentRoute
   '/master/new-project': typeof MasterNewProjectRoute
   '/master/': typeof MasterIndexRoute
@@ -306,7 +296,6 @@ export interface FileRouteTypes {
     | '/kpi-approvals'
     | '/kpi-board'
     | '/setup'
-    | '/upload-history'
     | '/weighting-assignment'
     | '/master/new-project'
     | '/master/'
@@ -334,7 +323,6 @@ export interface FileRouteTypes {
     | '/kpi-approvals'
     | '/kpi-board'
     | '/setup'
-    | '/upload-history'
     | '/weighting-assignment'
     | '/master/new-project'
     | '/master'
@@ -365,7 +353,6 @@ export interface FileRouteTypes {
     | '/_authenticated/kpi-approvals'
     | '/_authenticated/kpi-board'
     | '/_authenticated/setup'
-    | '/_authenticated/upload-history'
     | '/_authenticated/weighting-assignment'
     | '/master/new-project'
     | '/master/'
@@ -467,13 +454,6 @@ declare module '@tanstack/react-router' {
       path: '/weighting-assignment'
       fullPath: '/weighting-assignment'
       preLoaderRoute: typeof AuthenticatedWeightingAssignmentRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/upload-history': {
-      id: '/_authenticated/upload-history'
-      path: '/upload-history'
-      fullPath: '/upload-history'
-      preLoaderRoute: typeof AuthenticatedUploadHistoryRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/setup': {
@@ -644,7 +624,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedKpiApprovalsRoute: typeof AuthenticatedKpiApprovalsRoute
   AuthenticatedKpiBoardRoute: typeof AuthenticatedKpiBoardRoute
   AuthenticatedSetupRoute: typeof AuthenticatedSetupRoute
-  AuthenticatedUploadHistoryRoute: typeof AuthenticatedUploadHistoryRoute
   AuthenticatedWeightingAssignmentRoute: typeof AuthenticatedWeightingAssignmentRoute
 }
 
@@ -658,7 +637,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedKpiApprovalsRoute: AuthenticatedKpiApprovalsRoute,
   AuthenticatedKpiBoardRoute: AuthenticatedKpiBoardRoute,
   AuthenticatedSetupRoute: AuthenticatedSetupRoute,
-  AuthenticatedUploadHistoryRoute: AuthenticatedUploadHistoryRoute,
   AuthenticatedWeightingAssignmentRoute: AuthenticatedWeightingAssignmentRoute,
 }
 

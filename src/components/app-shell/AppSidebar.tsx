@@ -8,7 +8,6 @@ import {
   Upload,
   Scale,
   CheckSquare,
-  History,
   ChevronDown,
   type LucideIcon,
 } from "lucide-react";
@@ -51,7 +50,6 @@ const FLAT_NAV_ITEMS: NavItem[] = [
   { title: "Setup",             url: "/setup",                icon: Settings,    roles: ["hr_rep"] },
   { title: "Team Setup",         url: "/team-setup",           icon: Upload,      roles: ["hr_rep"] },
   { title: "Upload Actuals",    url: "/actuals-upload",       icon: Upload,      roles: ["hr_rep"] },
-  { title: "Upload History",    url: "/upload-history",       icon: History,     roles: ["hr_rep"] },
 ];
 
 // CEO grouped nav structure
@@ -86,7 +84,6 @@ const CEO_GROUPS: NavGroup[] = [
     items: [
       { title: "Team Setup",        url: "/team-setup" },
       { title: "Upload Actuals",   url: "/actuals-upload" },
-      { title: "Upload History",   url: "/upload-history" },
     ],
   },
 ];

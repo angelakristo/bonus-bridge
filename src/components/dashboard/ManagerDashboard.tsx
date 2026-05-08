@@ -20,6 +20,7 @@ type KpiRow = {
   kpi_title: string | null;
   driver: string | null;
   kpi_type: string | null;
+  scoring_type: string | null;
   unit: string | null;
   corporate_target_value: number | null;
   actual_value: number | null;
@@ -92,14 +93,14 @@ export function ManagerDashboard() {
     const [deptRes, indRes, bonusRes] = await Promise.all([
       supabase
         .from("v_kpi_actuals_with_targets")
-        .select("kpi_definition_id,kpi_title,driver,kpi_type,unit,corporate_target_value,actual_value,actual_binary,achievement_pct,person_id")
+        .select("kpi_definition_id,kpi_title,driver,kpi_type,scoring_type,unit,corporate_target_value,actual_value,actual_binary,achievement_pct,person_id")
         .eq("entity_id", entity_id)
         .eq("year", selected_year)
         .eq("period", period)
         .eq("kpi_level", "department"),
       supabase
         .from("v_kpi_actuals_with_targets")
-        .select("kpi_definition_id,kpi_title,driver,kpi_type,unit,corporate_target_value,actual_value,actual_binary,achievement_pct,person_id")
+        .select("kpi_definition_id,kpi_title,driver,kpi_type,scoring_type,unit,corporate_target_value,actual_value,actual_binary,achievement_pct,person_id")
         .eq("entity_id", entity_id)
         .eq("year", selected_year)
         .eq("period", period)
@@ -172,7 +173,7 @@ export function ManagerDashboard() {
                   <TableBody>
                     {deptKpis.map((r, i) => {
                       const ds = r.driver ? DRIVER_STYLE[r.driver] : null;
-                      const isBinary = r.kpi_type === "binary";
+                      const isBinary = r.scoring_type === "binary" || (r.scoring_type == null && r.kpi_type === "binary");
                       return (
                         <TableRow key={r.kpi_definition_id ?? i}>
                           <TableCell className="font-medium">{r.kpi_title}</TableCell>

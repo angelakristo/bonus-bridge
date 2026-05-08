@@ -21,6 +21,7 @@ type KpiRow = {
   kpi_title: string | null;
   driver: "growth" | "efficiency" | "culture" | null;
   kpi_type: "progressive" | "binary" | "benchmark" | null;
+  scoring_type: "higher_is_better" | "lower_is_better" | "target_range" | "threshold_tiered" | "binary" | null;
   unit: string | null;
   corporate_target_value: number | null;
   corporate_target_binary: boolean | null;
@@ -54,7 +55,7 @@ export function EmployeeDashboard() {
     setLoading(true);
     const { data, error } = await supabase
       .from("v_kpi_actuals_with_targets")
-      .select("kpi_definition_id,kpi_title,driver,kpi_type,unit,corporate_target_value,corporate_target_binary,actual_value,actual_binary,achievement_pct")
+      .select("kpi_definition_id,kpi_title,driver,kpi_type,scoring_type,unit,corporate_target_value,corporate_target_binary,actual_value,actual_binary,achievement_pct")
       .eq("entity_id", entity_id)
       .eq("person_id", person.id)
       .eq("year", selected_year)
@@ -118,7 +119,7 @@ export function EmployeeDashboard() {
               <TableBody>
                 {rows.map((r, i) => {
                   const ds = r.driver ? DRIVER_STYLE[r.driver] : null;
-                  const isBinary = r.kpi_type === "binary";
+                  const isBinary = r.scoring_type === "binary" || (r.scoring_type == null && r.kpi_type === "binary");
                   return (
                     <TableRow key={r.kpi_definition_id ?? i}>
                       <TableCell className="font-medium">{r.kpi_title ?? "—"}</TableCell>

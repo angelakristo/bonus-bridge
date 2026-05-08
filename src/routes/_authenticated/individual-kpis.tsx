@@ -79,7 +79,7 @@ function IndividualKpiProposalPage() {
     const { data, error } = await supabase
       .from("individual_kpis")
       .select(
-        "id, status, approval_note, kpi_definitions(id, title, description, driver, kpi_type, unit)",
+        "id, status, approval_note, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, unit)",
       )
       .eq("entity_id", entity_id)
       .eq("person_id", person.id)
@@ -102,6 +102,8 @@ function IndividualKpiProposalPage() {
           description: string | null;
           driver: IndividualKpiDetail["driver"];
           kpi_type: IndividualKpiDetail["kpi_type"];
+          period_agg_type: IndividualKpiDetail["period_agg_type"];
+          scoring_type: IndividualKpiDetail["scoring_type"];
           unit: string | null;
         } | null;
         if (!def) return null;
@@ -111,6 +113,8 @@ function IndividualKpiProposalPage() {
           description: def.description,
           driver: def.driver,
           kpi_type: def.kpi_type,
+          period_agg_type: def.period_agg_type,
+          scoring_type: def.scoring_type,
           unit: def.unit,
           status: r.status as Status,
           approval_note: (r as { approval_note?: string | null }).approval_note ?? null,

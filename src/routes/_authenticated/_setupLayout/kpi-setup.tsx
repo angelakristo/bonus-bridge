@@ -26,8 +26,9 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import type { KpiCardData } from "@/components/kpi/KpiCard";
-import { KpiTable } from "@/components/kpi/KpiTable";
+import { KpiTable, type KpiTableVariant } from "@/components/kpi/KpiTable";
 import { AddKpiModal, type KpiLevel } from "@/components/kpi/AddKpiModal";
+import { inferLegacyKpiType, derivePeriods } from "@/lib/kpi-engine";
 
 export const Route = createFileRoute("/_authenticated/_setupLayout/kpi-setup")({
   component: KpiSetupPage,
@@ -108,7 +109,7 @@ async function fetchLibrary(entityId: string, year: number): Promise<KpiCardData
 async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCardData[]> {
   const { data, error } = await supabase
     .from("corporate_kpis")
-    .select("id, display_order, kpi_definition_id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
+    .select("id, display_order, kpi_definition_id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
     .eq("entity_id", entityId).eq("year", year).order("display_order");
   if (error) throw error;
   if (!data?.length) return [];
@@ -127,30 +128,39 @@ async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCa
 
   const { data: deptLinks } = await supabase
     .from("department_kpis")
-    .select("corporate_kpi_id, kpi_definitions(title)")
+    .select("id, corporate_kpi_id, kpi_definitions(title)")
     .in("corporate_kpi_id", ids);
 
-  const deptLinksMap = new Map<string, string[]>();
-  for (const dl of deptLinks ?? []) {
-    const cid = (dl as unknown as { corporate_kpi_id: string | null }).corporate_kpi_id;
-    const title = (dl.kpi_definitions as unknown as { title: string } | null)?.title;
+  type DeptLinkRow = { id: string; corporate_kpi_id: string | null; kpi_definitions: unknown };
+  const deptLinksMap = new Map<string, { ids: string[]; titles: string[] }>();
+  for (const dl of (deptLinks ?? []) as unknown as DeptLinkRow[]) {
+    const cid   = dl.corporate_kpi_id;
+    const title = (dl.kpi_definitions as { title: string } | null)?.title;
     if (cid && title) {
-      if (!deptLinksMap.has(cid)) deptLinksMap.set(cid, []);
-      deptLinksMap.get(cid)!.push(title);
+      if (!deptLinksMap.has(cid)) deptLinksMap.set(cid, { ids: [], titles: [] });
+      deptLinksMap.get(cid)!.ids.push(dl.id);
+      deptLinksMap.get(cid)!.titles.push(title);
     }
   }
 
   return data.flatMap((row) => {
-    const def = row.kpi_definitions as unknown as { id: string; title: string; description: string | null; driver: string; kpi_type: string; unit: string | null } | null;
+    const def = row.kpi_definitions as unknown as { id: string; title: string; description: string | null; driver: string; kpi_type: string; period_agg_type: string | null; scoring_type: string | null; input_mode: string | null; unit: string | null } | null;
     if (!def) return [];
-    const pt = tgtMap.get(row.id) ?? {};
+    const pt    = tgtMap.get(row.id) ?? {};
+    const links = deptLinksMap.get(row.id);
     return [{
       id: def.id, board_kpi_id: row.id, title: def.title, description: def.description ?? null,
-      driver: def.driver as KpiCardData["driver"], kpi_type: def.kpi_type as KpiCardData["kpi_type"], unit: def.unit,
+      driver: def.driver as KpiCardData["driver"], kpi_type: def.kpi_type as KpiCardData["kpi_type"],
+      period_agg_type: (def.period_agg_type ?? null) as KpiCardData["period_agg_type"],
+      scoring_type:    (def.scoring_type    ?? null) as KpiCardData["scoring_type"],
+      input_mode:      (def.input_mode      ?? null) as KpiCardData["input_mode"],
+      unit: def.unit,
       period_targets: pt,
-      yearend_target_value: pt["fullyear"]?.target_value ?? null,
+      yearend_target_value:  pt["fullyear"]?.target_value  ?? null,
       yearend_target_binary: pt["fullyear"]?.target_binary ?? null,
-      linked_dept_kpi_titles: deptLinksMap.get(row.id) ?? null,
+      linked_dept_kpi_titles: links?.titles ?? null,
+      precedent_kpi_ids:      links?.ids    ?? null,
+      precedent_kpi_titles:   links?.titles ?? null,
     }];
   });
 }
@@ -158,7 +168,7 @@ async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCa
 async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: string): Promise<KpiCardData[]> {
   const { data, error } = await supabase
     .from("department_kpis")
-    .select("id, display_order, kpi_definition_id, corporate_kpi_id, kpi_definitions(id, title, description, driver, kpi_type, unit)")
+    .select("id, display_order, kpi_definition_id, corporate_kpi_id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
     .eq("entity_id", entityId).eq("year", year).eq("org_department_id", orgDeptId).order("display_order");
   if (error) throw error;
   if (!data?.length) return [];
@@ -166,11 +176,16 @@ async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: st
   const ids = data.map((r) => r.id);
   const corpKpiIds = [...new Set(data.map((r) => (r as unknown as { corporate_kpi_id?: string | null }).corporate_kpi_id).filter(Boolean))] as string[];
 
-  const [tgtsRes, corpKpiRes] = await Promise.all([
+  const [tgtsRes, corpKpiRes, indPrecRes] = await Promise.all([
     supabase.from("department_kpi_targets").select("department_kpi_id, period, target_value, target_binary").in("department_kpi_id", ids),
     corpKpiIds.length > 0
       ? supabase.from("corporate_kpis").select("id, kpi_definitions(title)").in("id", corpKpiIds)
       : Promise.resolve({ data: [] as { id: string; kpi_definitions: unknown }[] }),
+    // Individual KPIs that reference these dept KPIs (needs 20260511000000 migration)
+    supabase
+      .from("individual_kpis")
+      .select("id, department_kpi_id, kpi_definitions(title)")
+      .in("department_kpi_id" as never, ids) as unknown as Promise<{ data: { id: string; department_kpi_id: string; kpi_definitions: unknown }[] | null }>,
   ]);
 
   const tgtMap = new Map<string, Record<string, { target_value: number | null; target_binary: boolean | null }>>();
@@ -185,19 +200,39 @@ async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: st
     if (title) corpTitleMap.set(ck.id, title);
   }
 
+  // Map dept KPI ID → precedent individual KPIs {ids, titles}
+  const indPrecMap = new Map<string, { ids: string[]; titles: string[] }>();
+  for (const ip of (indPrecRes as { data: { id: string; department_kpi_id: string; kpi_definitions: unknown }[] | null }).data ?? []) {
+    const title = (ip.kpi_definitions as { title: string } | null)?.title;
+    if (title) {
+      if (!indPrecMap.has(ip.department_kpi_id)) indPrecMap.set(ip.department_kpi_id, { ids: [], titles: [] });
+      indPrecMap.get(ip.department_kpi_id)!.ids.push(ip.id);
+      indPrecMap.get(ip.department_kpi_id)!.titles.push(title);
+    }
+  }
+
   return data.flatMap((row) => {
-    const def = row.kpi_definitions as unknown as { id: string; title: string; description: string | null; driver: string; kpi_type: string; unit: string | null } | null;
+    const def = row.kpi_definitions as unknown as { id: string; title: string; description: string | null; driver: string; kpi_type: string; period_agg_type: string | null; scoring_type: string | null; input_mode: string | null; unit: string | null } | null;
     if (!def) return [];
-    const pt = tgtMap.get(row.id) ?? {};
+    const pt        = tgtMap.get(row.id) ?? {};
     const corpKpiId = (row as unknown as { corporate_kpi_id?: string | null }).corporate_kpi_id;
+    const indPrecs  = indPrecMap.get(row.id);
     return [{
       id: def.id, board_kpi_id: row.id, title: def.title, description: def.description ?? null,
-      driver: def.driver as KpiCardData["driver"], kpi_type: def.kpi_type as KpiCardData["kpi_type"], unit: def.unit,
+      driver: def.driver as KpiCardData["driver"], kpi_type: def.kpi_type as KpiCardData["kpi_type"],
+      period_agg_type: (def.period_agg_type ?? null) as KpiCardData["period_agg_type"],
+      scoring_type:    (def.scoring_type    ?? null) as KpiCardData["scoring_type"],
+      input_mode:      (def.input_mode      ?? null) as KpiCardData["input_mode"],
+      unit: def.unit,
       period_targets: pt,
-      yearend_target_value: pt["fullyear"]?.target_value ?? null,
+      yearend_target_value:  pt["fullyear"]?.target_value  ?? null,
       yearend_target_binary: pt["fullyear"]?.target_binary ?? null,
       corp_kpi_id:    corpKpiId ?? null,
       corp_kpi_title: corpKpiId ? (corpTitleMap.get(corpKpiId) ?? null) : null,
+      dependent_kpi_id:    corpKpiId ?? null,
+      dependent_kpi_title: corpKpiId ? (corpTitleMap.get(corpKpiId) ?? null) : null,
+      precedent_kpi_ids:    indPrecs?.ids    ?? null,
+      precedent_kpi_titles: indPrecs?.titles ?? null,
     }];
   });
 }
@@ -246,6 +281,28 @@ function KpiSetupPage() {
   const [panelSaving,   setPanelSaving]   = useState<Record<string, boolean>>({});
   const [multiDeleting, setMultiDeleting] = useState(false);
 
+  /* ── Cross-table KPI navigation ── */
+  const [libScrollTarget,   setLibScrollTarget]   = useState<string | null>(null);
+  const [corpScrollTarget,  setCorpScrollTarget]  = useState<string | null>(null);
+  const [deptScrollTargets, setDeptScrollTargets] = useState<Record<string, string | null>>({});
+
+  const kpiPanelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const k of library)  map[k.board_kpi_id ?? k.id] = "library";
+    for (const k of corpKpis) map[k.board_kpi_id ?? k.id] = "corporate";
+    for (const [deptId, kpis] of Object.entries(deptKpisMap))
+      for (const k of kpis) map[k.board_kpi_id ?? k.id] = deptId;
+    return map;
+  }, [library, corpKpis, deptKpisMap]);
+
+  const handleNavigateToKpi = useCallback((rowKey: string, _targetVariant: KpiTableVariant) => {
+    const panelKey = kpiPanelMap[rowKey];
+    if (!panelKey) return;
+    if (panelKey === "library")    setLibScrollTarget(rowKey);
+    else if (panelKey === "corporate") setCorpScrollTarget(rowKey);
+    else setDeptScrollTargets((prev) => ({ ...prev, [panelKey]: rowKey }));
+  }, [kpiPanelMap]);
+
   /* ── Panel state helpers ── */
   function ps(key: string): PanelState { return panelStates[key] ?? EMPTY_PANEL; }
   function updPanel(key: string, fn: (prev: PanelState) => PanelState) {
@@ -254,7 +311,7 @@ function KpiSetupPage() {
   function enterEdit(key: string, kpis: KpiCardData[]) {
     updPanel(key, () => ({
       isEditMode: true,
-      editingRows: Object.fromEntries(kpis.map((k) => [k.id, { ...k }])),
+      editingRows: Object.fromEntries(kpis.map((k) => [k.board_kpi_id ?? k.id, { ...k }])),
       isDeleteMode: false,
       selectedForDelete: new Set(),
     }));
@@ -391,36 +448,41 @@ function KpiSetupPage() {
     setPanelSaving((p) => ({ ...p, [panelKey]: true }));
     try {
       for (const kpi of edited) {
+        const legacyType = inferLegacyKpiType(kpi.period_agg_type ?? null, kpi.scoring_type ?? null);
         const { error: defErr } = await supabase
           .from("kpi_definitions")
-          .update({ title: kpi.title.trim(), description: kpi.description ?? null, driver: kpi.driver, kpi_type: kpi.kpi_type, unit: kpi.unit })
+          .update({
+            title: kpi.title.trim(), description: kpi.description ?? null,
+            driver: kpi.driver, kpi_type: legacyType,
+            period_agg_type: kpi.period_agg_type ?? null,
+            scoring_type:    kpi.scoring_type    ?? null,
+            input_mode:      kpi.input_mode      ?? null,
+            unit: kpi.unit,
+          })
           .eq("id", kpi.id);
         if (defErr) throw defErr;
 
         if (kpi.board_kpi_id) {
           const isCorpPanel = panelKey === "corporate";
+          const isBinary = kpi.scoring_type === "binary" || (!kpi.scoring_type && kpi.kpi_type === "binary");
 
           let upsertRows: { period: PeriodEnum; target_value: number | null; target_binary: boolean | null }[];
 
-          if (kpi.kpi_type === "binary") {
-            // Binary: only H1 and FY with binary flags
+          if (isBinary) {
             const pt = kpi.period_targets ?? {};
             upsertRows = [
               { period: "h1",       target_binary: pt["h1"]?.target_binary ?? null,       target_value: null },
               { period: "fullyear", target_binary: pt["fullyear"]?.target_binary ?? null, target_value: null },
             ];
           } else {
-            // Progressive / Benchmark: Q1-Q4 editable, H1/H2/FY derived
-            const pt = kpi.period_targets ?? {};
-            const q1 = pt["q1"]?.target_value ?? null;
-            const q2 = pt["q2"]?.target_value ?? null;
-            const q3 = pt["q3"]?.target_value ?? null;
-            const q4 = pt["q4"]?.target_value ?? null;
-            const h1 = q1 !== null && q2 !== null ? q1 + q2 : null;
-            const h2 = q3 !== null && q4 !== null ? q3 + q4 : null;
-            const fy = h1 !== null && h2 !== null ? h1 + h2 : null;
+            const pt  = kpi.period_targets ?? {};
+            const q1  = pt["q1"]?.target_value ?? null;
+            const q2  = pt["q2"]?.target_value ?? null;
+            const q3  = pt["q3"]?.target_value ?? null;
+            const q4  = pt["q4"]?.target_value ?? null;
+            const drv = derivePeriods(q1, q2, q3, q4, kpi.period_agg_type ?? null);
             const all: [PeriodEnum, number | null][] = [
-              ["q1", q1], ["q2", q2], ["h1", h1], ["q3", q3], ["q4", q4], ["h2", h2], ["fullyear", fy],
+              ["q1", q1], ["q2", q2], ["h1", drv.h1], ["q3", q3], ["q4", q4], ["h2", drv.h2], ["fullyear", drv.fy],
             ];
             upsertRows = all.map(([period, v]) => ({ period, target_value: v, target_binary: null }));
           }
@@ -459,7 +521,7 @@ function KpiSetupPage() {
     const { panelKey } = deleteDialog;
     const state = ps(panelKey);
     const kpis = panelKey === "corporate" ? corpKpis : (deptKpisMap[panelKey] ?? []);
-    const selected = kpis.filter((k) => state.selectedForDelete.has(k.id));
+    const selected = kpis.filter((k) => state.selectedForDelete.has(k.board_kpi_id ?? k.id));
     const boardIds = selected.map((k) => k.board_kpi_id).filter(Boolean) as string[];
     if (boardIds.length === 0) { setDeleteDialog(null); cancelDelete(panelKey); return; }
 
@@ -687,7 +749,12 @@ function KpiSetupPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
-            <KpiTable kpis={library} variant="library" loading={libLoading} />
+            <KpiTable
+              kpis={library} variant="library" loading={libLoading}
+              onNavigateToKpi={handleNavigateToKpi}
+              scrollTarget={libScrollTarget}
+              onScrollHandled={() => setLibScrollTarget(null)}
+            />
           </CardContent>
         </Card>
 
@@ -718,6 +785,9 @@ function KpiSetupPage() {
               isDeleteMode={ps("corporate").isDeleteMode}
               selectedForDelete={ps("corporate").selectedForDelete}
               onToggleSelect={(id) => toggleSelect("corporate", id)}
+              onNavigateToKpi={handleNavigateToKpi}
+              scrollTarget={corpScrollTarget}
+              onScrollHandled={() => setCorpScrollTarget(null)}
             />
           </CardContent>
         </Card>
@@ -754,6 +824,9 @@ function KpiSetupPage() {
                   selectedForDelete={ps(dept.id).selectedForDelete}
                   onToggleSelect={(id) => toggleSelect(dept.id, id)}
                   corpKpisForLink={corpKpisForLink}
+                  onNavigateToKpi={handleNavigateToKpi}
+                  scrollTarget={deptScrollTargets[dept.id] ?? null}
+                  onScrollHandled={() => setDeptScrollTargets((prev) => ({ ...prev, [dept.id]: null }))}
                 />
               </CardContent>
             </Card>

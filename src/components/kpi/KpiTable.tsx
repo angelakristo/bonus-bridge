@@ -1,4 +1,5 @@
-import { Pencil, Trash2, Loader2 } from "lucide-react";
+import { useRef, useState, useCallback, useEffect } from "react";
+import { ArrowUpRight, Pencil, Trash2, Loader2 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,21 +16,25 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import type { KpiCardData } from "@/components/kpi/KpiCard";
+import type { PeriodAggType, ScoringType, InputMode } from "@/lib/kpi-engine";
 import {
   deriveSinglePeriod,
   isDerivedPeriod,
   PERIOD_AGG_META,
   SCORING_TYPE_META,
+  INPUT_MODE_META,
   DERIVED_PERIODS as ENGINE_DERIVED_PERIODS,
 } from "@/lib/kpi-engine";
 
-export type KpiTableVariant = "library" | "corporate" | "department";
+export type KpiTableVariant = "library" | "corporate" | "department" | "individual";
 
 type Props = {
   kpis: KpiCardData[];
@@ -39,11 +44,22 @@ type Props = {
   onDelete?: (kpi: KpiCardData) => void;
   isEditMode?: boolean;
   editingRows?: Record<string, KpiCardData>;
-  onRowChange?: (kpiId: string, updated: KpiCardData) => void;
+  onRowChange?: (rowKey: string, updated: KpiCardData) => void;
   isDeleteMode?: boolean;
   selectedForDelete?: Set<string>;
-  onToggleSelect?: (kpiId: string) => void;
+  onToggleSelect?: (rowKey: string) => void;
   corpKpisForLink?: { id: string; title: string }[];
+  /** Weight column support — provide both to show the column. */
+  getWeight?: (boardKpiId: string) => number;
+  setWeight?: (boardKpiId: string, n: number) => void;
+  /** Precomputed subtotal for the footer row (shown when getWeight is provided). */
+  subtotal?: number;
+  /** Called when a related-KPI click targets a row not in this table; parent handles cross-table navigation. */
+  onNavigateToKpi?: (rowKey: string, targetVariant: KpiTableVariant) => void;
+  /** Externally injected scroll target; when set, this table scrolls to + highlights that row. */
+  scrollTarget?: string | null;
+  /** Called after scrollTarget has been handled so the parent can clear it. */
+  onScrollHandled?: () => void;
 };
 
 /* ── Style maps ── */
@@ -54,28 +70,26 @@ const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> 
   culture:    { bg: "bg-amber-100 dark:bg-amber-900/30", text: "text-amber-800 dark:text-amber-300", label: "Culture"    },
 };
 
-const LEGACY_TYPE_STYLE: Record<string, { label: string; className: string }> = {
-  progressive: { label: "Progressive", className: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300" },
-  binary:      { label: "Binary",      className: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"             },
-  benchmark:   { label: "Benchmark",   className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
+const LEGACY_AGG_LABEL: Record<string, string> = {
+  progressive: "Progressive",
+  binary:      "Binary",
+  benchmark:   "Benchmark",
 };
 
-/** Return badge label + className for the type column, preferring new model. */
-function getTypeBadge(kpi: KpiCardData): { label: string; className: string; scoringLabel?: string } {
-  if (kpi.period_agg_type) {
-    return {
-      label: PERIOD_AGG_META[kpi.period_agg_type].shortLabel,
-      className: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300",
-      scoringLabel: kpi.scoring_type ? SCORING_TYPE_META[kpi.scoring_type].label : undefined,
-    };
-  }
-  return LEGACY_TYPE_STYLE[kpi.kpi_type] ?? LEGACY_TYPE_STYLE.progressive;
-}
+const SCORING_SHORT: Record<ScoringType, string> = {
+  higher_is_better: "Higher",
+  lower_is_better:  "Lower",
+  target_range:     "Range",
+  threshold_tiered: "Tiered",
+  binary:           "Binary",
+};
 
-const LINK_COL_LABEL: Record<KpiTableVariant, string> = {
-  library:    "Related KPI",
-  corporate:  "Department KPI",
-  department: "Corporate KPI",
+const INPUT_SHORT: Record<InputMode, string> = {
+  periodic:            "Periodic",
+  cumulative_to_date:  "Cumulative",
+  period_end_snapshot: "Snapshot",
+  component_based:     "Component",
+  manual_aggregate:    "Manual",
 };
 
 /* ── Period columns ── */
@@ -88,6 +102,8 @@ const PERIOD_LABEL: Record<Period, string> = {
 };
 
 const BINARY_EDITABLE = new Set<Period>(["h1", "fullyear"]);
+
+const UNIT_OPTS = ["", "%", "EUR", "EUR M", "Count", "Score"] as const;
 
 /* ── Helpers ── */
 
@@ -106,7 +122,87 @@ function periodCell(kpi: KpiCardData, period: Period): string {
   return String(t.target_value);
 }
 
-const UNIT_OPTS = ["", "%", "EUR", "EUR M", "Count", "Score"] as const;
+/* ── Weight sub-components ── */
+
+function WeightInput({
+  value, onChange, ariaLabel,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  ariaLabel?: string;
+}) {
+  return (
+    <div className="flex items-center gap-1 justify-end">
+      <Input
+        type="number" min={0} max={100} step={1}
+        aria-label={ariaLabel}
+        value={Number.isFinite(value) ? value : 0}
+        onChange={(e) => {
+          const n = parseInt(e.target.value, 10);
+          onChange(Number.isNaN(n) ? 0 : Math.min(100, Math.max(0, n)));
+        }}
+        className="h-7 w-16 text-right text-xs"
+      />
+      <span className="text-xs text-muted-foreground">%</span>
+    </div>
+  );
+}
+
+function SubtotalLabel({ sum }: { sum: number }) {
+  const color = sum === 100 ? "text-green-600" : sum > 100 ? "text-destructive" : "text-muted-foreground";
+  return <span className={cn("text-sm font-medium", color)}>{sum}% of 100%</span>;
+}
+
+/* ── Related KPI badge ── */
+
+function RelatedKpiBadge({
+  title, isDependent, onClick,
+}: {
+  title: string;
+  isDependent?: boolean;
+  onClick?: () => void;
+}) {
+  const inner = (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex items-center gap-0.5 text-left group",
+        onClick ? "cursor-pointer hover:underline" : "cursor-default",
+        "text-blue-600 dark:text-blue-400 text-[11px] leading-tight",
+      )}
+    >
+      {!isDependent && <ArrowUpRight className="h-3 w-3 flex-shrink-0" />}
+      <span className="break-words whitespace-normal">{title}</span>
+      {isDependent && <ArrowUpRight className="h-3 w-3 flex-shrink-0" />}
+    </button>
+  );
+
+  if (!onClick) return inner;
+
+  return (
+    <TooltipProvider delayDuration={400}>
+      <Tooltip>
+        <TooltipTrigger asChild>{inner}</TooltipTrigger>
+        <TooltipContent side="top" className="text-xs">Click to navigate to this KPI</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
+
+/* ── Variant inference ── */
+
+function inferPrecedentVariant(v: KpiTableVariant): KpiTableVariant {
+  if (v === "corporate")  return "department";
+  if (v === "department") return "individual";
+  return "department"; // library / individual have no well-defined lower level
+}
+
+function inferDependentVariant(v: KpiTableVariant): KpiTableVariant {
+  if (v === "department") return "corporate";
+  if (v === "individual") return "department";
+  return "corporate"; // library / corporate have no well-defined upper level
+}
 
 /* ── Component ── */
 
@@ -116,9 +212,47 @@ export function KpiTable({
   isEditMode, editingRows, onRowChange,
   isDeleteMode, selectedForDelete, onToggleSelect,
   corpKpisForLink,
+  getWeight, setWeight, subtotal,
+  onNavigateToKpi, scrollTarget, onScrollHandled,
 }: Props) {
-  const showTargets = true;
   const showActions = variant !== "library" && (!!onEdit || !!onDelete) && !isEditMode && !isDeleteMode;
+  const showWeight  = !!getWeight && !!setWeight;
+
+  // Total column count for footer colspan
+  const totalCols =
+    (isDeleteMode ? 1 : 0) +
+    15 +   // title + desc + period_agg + scoring + input_mode + related + driver + unit + 7 periods
+    (showWeight  ? 1 : 0) +
+    (showActions ? 1 : 0);
+
+  // ── Scroll-to-row ──────────────────────────────────────────────────────────
+  const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  const [highlightedRow, setHighlightedRow] = useState<string | null>(null);
+
+  const scrollToRow = useCallback((rowKey: string, targetVariant: KpiTableVariant) => {
+    const el = rowRefs.current[rowKey];
+    if (!el) {
+      onNavigateToKpi?.(rowKey, targetVariant);
+      return;
+    }
+    el.scrollIntoView({ behavior: "smooth", block: "center" });
+    setHighlightedRow(rowKey);
+    setTimeout(() => setHighlightedRow(null), 1500);
+  }, [onNavigateToKpi]);
+
+  // ── External scroll target (cross-table navigation from parent) ────────────
+  useEffect(() => {
+    if (!scrollTarget) return;
+    const el = rowRefs.current[scrollTarget];
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      setHighlightedRow(scrollTarget);
+      setTimeout(() => setHighlightedRow(null), 1500);
+    }
+    onScrollHandled?.();
+    // onScrollHandled intentionally omitted from deps — it's a stable clear-state callback
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollTarget]);
 
   if (loading) {
     return (
@@ -133,7 +267,9 @@ export function KpiTable({
       <p className="py-6 text-center text-sm text-muted-foreground">
         {variant === "library"
           ? "No KPIs defined yet."
-          : "No KPIs added yet. Click Add KPI to create one."}
+          : showWeight
+            ? "No KPIs assigned in this group."
+            : "No KPIs added yet. Click Add KPI to create one."}
       </p>
     );
   }
@@ -146,11 +282,13 @@ export function KpiTable({
             {isDeleteMode && <TableHead className="w-8 px-3" />}
             <TableHead className="w-40">Title</TableHead>
             <TableHead className="w-44">Description</TableHead>
-            <TableHead className="w-28">Type</TableHead>
+            <TableHead className="w-24">Period Agg</TableHead>
+            <TableHead className="w-24">Scoring</TableHead>
+            <TableHead className="w-22">Input</TableHead>
+            <TableHead className="w-36">Related KPIs</TableHead>
             <TableHead className="w-28">Driver</TableHead>
-            <TableHead className="w-36">{LINK_COL_LABEL[variant]}</TableHead>
             <TableHead className="w-20">Unit</TableHead>
-            {showTargets && PERIODS.map((p) => (
+            {PERIODS.map((p) => (
               <TableHead key={p} className="w-14 text-right">
                 {PERIOD_LABEL[p]}
                 {isEditMode && !ENGINE_DERIVED_PERIODS.has(p) && (
@@ -158,19 +296,21 @@ export function KpiTable({
                 )}
               </TableHead>
             ))}
+            {showWeight  && <TableHead className="w-28 text-right">Weight %</TableHead>}
             {showActions && <TableHead className="w-16 text-right">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {kpis.map((kpi) => {
-            const row: KpiCardData = (isEditMode ? editingRows?.[kpi.id] : undefined) ?? kpi;
-            const isSelected = !!(isDeleteMode && selectedForDelete?.has(kpi.id));
+            const rowKey    = kpi.board_kpi_id ?? kpi.id;
+            const row: KpiCardData = (isEditMode ? editingRows?.[rowKey] : undefined) ?? kpi;
+            const isSelected = !!(isDeleteMode && selectedForDelete?.has(rowKey));
+            const isHighlighted = highlightedRow === rowKey;
             const ds = DRIVER_STYLE[row.driver] ?? DRIVER_STYLE.growth;
-            const tb = getTypeBadge(row);
             const isBinary = isBinaryKpi(row);
 
             const change = (updates: Partial<KpiCardData>) =>
-              onRowChange?.(kpi.id, { ...row, ...updates } as KpiCardData);
+              onRowChange?.(rowKey, { ...row, ...updates } as KpiCardData);
 
             const changePeriod = (
               period: Period,
@@ -181,13 +321,44 @@ export function KpiTable({
               change({ period_targets: pt });
             };
 
+            // ── Build related-KPI display data ────────────────────────────────
+            // Precedents: KPIs at the level below that point TO this KPI.
+            // Use new fields when present; fall back to legacy linked_dept_kpi_titles.
+            const precedents: { rowKey: string | null; title: string }[] =
+              kpi.precedent_kpi_titles?.length
+                ? kpi.precedent_kpi_titles.map((title, i) => ({
+                    rowKey: kpi.precedent_kpi_ids?.[i] ?? null,
+                    title,
+                  }))
+                : variant === "corporate" || variant === "library"
+                  ? (kpi.linked_dept_kpi_titles ?? []).map((title) => ({ rowKey: null, title }))
+                  : [];
+
+            // Dependent: the KPI at the level above that this KPI points TO.
+            // Use new field when present; fall back to legacy corp_kpi_title / description prefix.
+            const dependent: { rowKey: string | null; title: string } | null =
+              kpi.dependent_kpi_title
+                ? { rowKey: kpi.dependent_kpi_id ?? null, title: kpi.dependent_kpi_title }
+                : (variant === "department" || variant === "library") && kpi.corp_kpi_title
+                  ? { rowKey: kpi.corp_kpi_id ?? null, title: kpi.corp_kpi_title }
+                  : variant === "individual" || variant === "library"
+                    ? (() => {
+                        const m = (kpi.description ?? "").match(/^Aligns to dept KPI: (.+?)\./);
+                        return m ? { rowKey: null, title: m[1] } : null;
+                      })()
+                    : null;
+
+            const hasRelated = precedents.length > 0 || dependent !== null;
+
             return (
               <TableRow
-                key={kpi.id}
+                key={rowKey}
+                ref={(el) => { rowRefs.current[rowKey] = el; }}
                 className={cn(
                   "align-top",
-                  isSelected && "bg-destructive/10 hover:bg-destructive/15",
-                  isEditMode  && "bg-muted/20",
+                  isSelected    && "bg-destructive/10 hover:bg-destructive/15",
+                  isEditMode    && "bg-muted/20",
+                  isHighlighted && "bg-blue-50 dark:bg-blue-950/30 ring-2 ring-inset ring-blue-400",
                 )}
               >
                 {/* Checkbox */}
@@ -195,7 +366,7 @@ export function KpiTable({
                   <TableCell className="px-3 pt-2.5">
                     <Checkbox
                       checked={isSelected}
-                      onCheckedChange={() => onToggleSelect?.(kpi.id)}
+                      onCheckedChange={() => onToggleSelect?.(rowKey)}
                     />
                   </TableCell>
                 )}
@@ -222,33 +393,123 @@ export function KpiTable({
                       className="h-7 text-xs w-full"
                     />
                   ) : (
-                    <span className="block break-words whitespace-normal">{kpi.description ?? "—"}</span>
+                    <span className="block break-words whitespace-normal">
+                      {variant === "individual"
+                        ? (() => {
+                            const m = (kpi.description ?? "").match(/^Aligns to dept KPI: .+?\.\s*/);
+                            return m ? kpi.description!.slice(m[0].length) || "—" : (kpi.description ?? "—");
+                          })()
+                        : (kpi.description ?? "—")}
+                    </span>
                   )}
                 </TableCell>
 
-                {/* Type */}
+                {/* Period Aggregation */}
                 <TableCell className="align-top">
                   {isEditMode ? (
                     <Select
-                      value={row.kpi_type}
-                      onValueChange={(v) => change({ kpi_type: v as KpiCardData["kpi_type"] })}
+                      value={row.period_agg_type ?? "additive_flow"}
+                      onValueChange={(v) => change({ period_agg_type: v as PeriodAggType })}
                     >
                       <SelectTrigger className="h-7 text-xs w-full"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="progressive">Progressive</SelectItem>
-                        <SelectItem value="binary">Binary</SelectItem>
-                        <SelectItem value="benchmark">Benchmark</SelectItem>
+                        {(Object.keys(PERIOD_AGG_META) as PeriodAggType[]).map((k) => (
+                          <SelectItem key={k} value={k}>{PERIOD_AGG_META[k].shortLabel}</SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <div className="flex flex-col gap-0.5">
-                      <Badge variant="outline" className={cn("border-0 text-xs font-medium", tb.className)}>
-                        {tb.label}
-                      </Badge>
-                      {tb.scoringLabel && (
-                        <span className="text-[10px] text-muted-foreground leading-tight">{tb.scoringLabel}</span>
+                    <Badge
+                      variant="outline"
+                      className="border-0 text-xs font-medium bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300"
+                    >
+                      {row.period_agg_type
+                        ? PERIOD_AGG_META[row.period_agg_type].shortLabel
+                        : (LEGACY_AGG_LABEL[row.kpi_type] ?? "—")}
+                    </Badge>
+                  )}
+                </TableCell>
+
+                {/* Scoring */}
+                <TableCell className="align-top">
+                  {isEditMode ? (
+                    <Select
+                      value={row.scoring_type ?? "higher_is_better"}
+                      onValueChange={(v) => change({ scoring_type: v as ScoringType })}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(SCORING_TYPE_META) as ScoringType[]).map((k) => (
+                          <SelectItem key={k} value={k}>{SCORING_TYPE_META[k].label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {row.scoring_type ? SCORING_SHORT[row.scoring_type] : "—"}
+                    </span>
+                  )}
+                </TableCell>
+
+                {/* Input Mode */}
+                <TableCell className="align-top">
+                  {isEditMode ? (
+                    <Select
+                      value={row.input_mode ?? "periodic"}
+                      onValueChange={(v) => change({ input_mode: v as InputMode })}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-full"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {(Object.keys(INPUT_MODE_META) as InputMode[]).map((k) => (
+                          <SelectItem key={k} value={k}>{INPUT_MODE_META[k].label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">
+                      {row.input_mode ? INPUT_SHORT[row.input_mode] : "—"}
+                    </span>
+                  )}
+                </TableCell>
+
+                {/* Related KPIs — precedents above, dependent below */}
+                <TableCell className="align-top">
+                  {variant === "department" && isEditMode ? (
+                    // Edit mode: corp KPI selector (sets the dependent link)
+                    <Select
+                      value={row.corp_kpi_id ?? "__none__"}
+                      onValueChange={(v) => change({ corp_kpi_id: v === "__none__" ? null : v })}
+                    >
+                      <SelectTrigger className="h-7 text-xs w-full">
+                        <SelectValue placeholder="None" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="__none__">None</SelectItem>
+                        {(corpKpisForLink ?? []).map((c) => (
+                          <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : hasRelated ? (
+                    <div className="flex flex-col gap-1">
+                      {precedents.map((p, i) => (
+                        <RelatedKpiBadge
+                          key={i}
+                          title={p.title}
+                          isDependent={false}
+                          onClick={p.rowKey ? () => scrollToRow(p.rowKey!, inferPrecedentVariant(variant)) : undefined}
+                        />
+                      ))}
+                      {dependent && (
+                        <RelatedKpiBadge
+                          title={dependent.title}
+                          isDependent={true}
+                          onClick={dependent.rowKey ? () => scrollToRow(dependent.rowKey!, inferDependentVariant(variant)) : undefined}
+                        />
                       )}
                     </div>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
                   )}
                 </TableCell>
 
@@ -270,60 +531,6 @@ export function KpiTable({
                     <Badge variant="outline" className={cn("border-0 text-xs font-medium", ds.bg, ds.text)}>
                       {ds.label}
                     </Badge>
-                  )}
-                </TableCell>
-
-                {/* Link column — label and content vary by variant */}
-                <TableCell className="text-xs align-top">
-                  {variant === "department" && isEditMode ? (
-                    <Select
-                      value={row.corp_kpi_id ?? "__none__"}
-                      onValueChange={(v) => change({ corp_kpi_id: v === "__none__" ? null : v })}
-                    >
-                      <SelectTrigger className="h-7 text-xs w-full">
-                        <SelectValue placeholder="None" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">None</SelectItem>
-                        {(corpKpisForLink ?? []).map((c) => (
-                          <SelectItem key={c.id} value={c.id}>{c.title}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : variant === "corporate" ? (
-                    kpi.linked_dept_kpi_titles?.length ? (
-                      <div className="flex flex-col gap-0.5">
-                        {kpi.linked_dept_kpi_titles.map((t, i) => (
-                          <span key={i} className="block break-words whitespace-normal font-medium text-foreground">
-                            ↗ {t}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )
-                  ) : variant === "department" ? (
-                    kpi.corp_kpi_title ? (
-                      <span className="block break-words whitespace-normal font-medium text-foreground">
-                        ↗ {kpi.corp_kpi_title}
-                      </span>
-                    ) : (
-                      <span className="text-muted-foreground">—</span>
-                    )
-                  ) : kpi.linked_dept_kpi_titles?.length ? (
-                    <div className="flex flex-col gap-0.5">
-                      {kpi.linked_dept_kpi_titles.map((t, i) => (
-                        <span key={i} className="block break-words whitespace-normal font-medium text-foreground">
-                          ↗ {t}
-                        </span>
-                      ))}
-                    </div>
-                  ) : kpi.corp_kpi_title ? (
-                    <span className="block break-words whitespace-normal font-medium text-foreground">
-                      ↗ {kpi.corp_kpi_title}
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">—</span>
                   )}
                 </TableCell>
 
@@ -357,7 +564,7 @@ export function KpiTable({
                 </TableCell>
 
                 {/* Period targets */}
-                {showTargets && PERIODS.map((p) => (
+                {PERIODS.map((p) => (
                   <TableCell key={p} className="text-right text-xs tabular-nums align-top">
                     {isEditMode ? (
                       (() => {
@@ -407,6 +614,17 @@ export function KpiTable({
                   </TableCell>
                 ))}
 
+                {/* Weight % */}
+                {showWeight && (
+                  <TableCell className="align-top text-right">
+                    <WeightInput
+                      ariaLabel={`Weight for ${kpi.title}`}
+                      value={getWeight!(rowKey)}
+                      onChange={(n) => setWeight!(rowKey, n)}
+                    />
+                  </TableCell>
+                )}
+
                 {/* Actions */}
                 {showActions && (
                   <TableCell className="text-right align-top">
@@ -432,6 +650,23 @@ export function KpiTable({
             );
           })}
         </TableBody>
+
+        {/* Subtotal footer — only when weight column is present */}
+        {showWeight && subtotal !== undefined && (
+          <TableFooter>
+            <TableRow>
+              <TableCell
+                colSpan={totalCols - 1}
+                className="text-xs text-muted-foreground uppercase tracking-wide py-2"
+              >
+                Subtotal
+              </TableCell>
+              <TableCell className="text-right py-2">
+                <SubtotalLabel sum={subtotal} />
+              </TableCell>
+            </TableRow>
+          </TableFooter>
+        )}
       </Table>
     </div>
   );

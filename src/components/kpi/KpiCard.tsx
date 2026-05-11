@@ -37,6 +37,16 @@ export type KpiCardData = {
   corp_kpi_id?: string | null;
   /** Dept KPI titles that reference this corporate KPI (corporate KPIs only) */
   linked_dept_kpi_titles?: string[] | null;
+
+  // ── Cross-level relationship fields ─────────────────────────────────────────
+  /** board_kpi_ids of KPIs at the level below that point TO this KPI */
+  precedent_kpi_ids?: string[] | null;
+  /** Display titles for precedent_kpi_ids (parallel array) */
+  precedent_kpi_titles?: string[] | null;
+  /** board_kpi_id of the KPI at the level above that this KPI points TO */
+  dependent_kpi_id?: string | null;
+  /** Display title for dependent_kpi_id */
+  dependent_kpi_title?: string | null;
 };
 
 const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> = {

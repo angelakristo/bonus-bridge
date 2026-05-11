@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { Loader2, Pencil, Plus, Save, Trash2 } from "lucide-react";
+import { Info, Loader2, Pencil, Plus, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,6 +8,7 @@ import { useEntity } from "@/contexts/EntityContext";
 import { useYear } from "@/contexts/YearContext";
 import { supabase } from "@/integrations/supabase/client";
 import type { KpiCardData } from "@/components/kpi/KpiCard";
+import { KpiTable, type KpiTableVariant } from "@/components/kpi/KpiTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,7 +32,6 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Select,
   SelectContent,
@@ -40,19 +40,25 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
+import {
+  type PeriodAggType,
+  type ScoringType,
+  type InputMode,
+  derivePeriods,
+  defaultsForAggType,
+  inferLegacyKpiType,
+  PERIOD_AGG_META,
+  SCORING_TYPE_META,
+  INPUT_MODE_META,
+} from "@/lib/kpi-engine";
+import {
+  isCalcModelSchemaMissing,
+  omitCalcModelFields,
+  MIGRATION_HINT,
+} from "@/lib/kpi-save-compat";
 
 export const Route = createFileRoute("/_authenticated/weighting-assignment")({
   component: WeightingAssignmentPage,
@@ -71,20 +77,6 @@ type QuarterPeriod      = "q1" | "q2" | "q3" | "q4";
 type BinaryTargetPeriod = "h1" | "fullyear";
 
 type DeptKpiOption = { id: string; title: string };
-
-/* ── Table constants (mirror KpiTable) ──────────────────────────────────────── */
-
-const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> = {
-  growth:     { bg: "bg-green-100 dark:bg-green-900/30",  text: "text-green-800 dark:text-green-300",  label: "Growth"     },
-  efficiency: { bg: "bg-blue-100 dark:bg-blue-900/30",    text: "text-blue-800 dark:text-blue-300",    label: "Efficiency" },
-  culture:    { bg: "bg-amber-100 dark:bg-amber-900/30",  text: "text-amber-800 dark:text-amber-300",  label: "Culture"    },
-};
-
-const TYPE_STYLE: Record<string, { label: string; className: string }> = {
-  progressive: { label: "Progressive", className: "bg-violet-100 text-violet-800 dark:bg-violet-900/30 dark:text-violet-300" },
-  binary:      { label: "Binary",      className: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300"             },
-  benchmark:   { label: "Benchmark",   className: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300" },
-};
 
 const GROUP_COLORS = [
   { key: "corporate",  label: "Corporate",  bar: "bg-blue-500",    dot: "bg-blue-500"    },
@@ -114,14 +106,20 @@ const PERIOD_LABEL: Record<Period, string> = {
   q1: "Q1", q2: "Q2", h1: "H1", q3: "Q3", q4: "Q4", h2: "H2", fullyear: "FY",
 };
 
-const DERIVED_PERIODS = new Set<Period>(["h1", "h2", "fullyear"]);
-const BINARY_EDITABLE  = new Set<Period>(["h1", "fullyear"]);
+const ALL_PERIODS = PERIODS;
 
-const LINK_COL_LABEL: Record<"corporate" | "department" | "individual", string> = {
-  corporate:  "Department KPI",
-  department: "Corporate KPI",
-  individual: "Dept KPI Ref",
-};
+function FieldInfo({ text }: { text: string }) {
+  return (
+    <TooltipProvider>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Info className="inline h-3.5 w-3.5 ml-1 text-muted-foreground cursor-help" />
+        </TooltipTrigger>
+        <TooltipContent side="right" className="max-w-xs text-xs">{text}</TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
+  );
+}
 
 /* ── Helpers ────────────────────────────────────────────────────────────────── */
 
@@ -158,32 +156,6 @@ function extractDeptRef(desc: string | null): { deptRef: string | null; cleanDes
   const m = desc.match(/^Aligns to dept KPI: (.+?)\.\s*/);
   if (m) return { deptRef: m[1], cleanDesc: desc.slice(m[0].length) || null };
   return { deptRef: null, cleanDesc: desc };
-}
-
-function periodCell(kpi: KpiCardData, period: Period): string {
-  const t = kpi.period_targets?.[period];
-  if (kpi.kpi_type === "binary") {
-    if (!BINARY_EDITABLE.has(period)) return "—";
-    if (!t) return "—";
-    return t.target_binary === true ? "✓" : t.target_binary === false ? "✗" : "—";
-  }
-  if (!t || t.target_value === null) return "—";
-  return String(t.target_value);
-}
-
-function computeDerived(
-  pt: Record<string, { target_value: number | null; target_binary: boolean | null }> | undefined,
-  p: "h1" | "h2" | "fullyear",
-): number | null {
-  const q1 = pt?.["q1"]?.target_value ?? null;
-  const q2 = pt?.["q2"]?.target_value ?? null;
-  const q3 = pt?.["q3"]?.target_value ?? null;
-  const q4 = pt?.["q4"]?.target_value ?? null;
-  const h1 = q1 !== null && q2 !== null ? q1 + q2 : null;
-  const h2 = q3 !== null && q4 !== null ? q3 + q4 : null;
-  if (p === "h1") return h1;
-  if (p === "h2") return h2;
-  return h1 !== null && h2 !== null ? h1 + h2 : null;
 }
 
 /* ── AllocationBar ───────────────────────────────────────────────────────────── */
@@ -239,344 +211,34 @@ function SubtotalLabel({ sum }: { sum: number }) {
   return <span className={cn("text-sm font-medium", color)}>{sum}% of 100%</span>;
 }
 
-/* ── WeightKpiTable ─────────────────────────────────────────────────────────── */
-
-function WeightKpiTable({
-  kpis, variant, loading,
-  getWeight, setWeight,
-  isEditMode, editingRows, onRowChange,
-  isDeleteMode, selectedForDelete, onToggleSelect,
-}: {
-  kpis: WeightKpiRow[];
-  variant: "corporate" | "department" | "individual";
-  loading?: boolean;
-  getWeight: (boardKpiId: string) => number;
-  setWeight: (boardKpiId: string, n: number) => void;
-  isEditMode?: boolean;
-  editingRows?: Record<string, WeightKpiRow>;
-  onRowChange?: (boardKpiId: string, updater: (row: WeightKpiRow) => WeightKpiRow) => void;
-  isDeleteMode?: boolean;
-  selectedForDelete?: Set<string>;
-  onToggleSelect?: (boardKpiId: string) => void;
-}) {
-  const subtotal = kpis.reduce((acc, r) => acc + getWeight(r.board_kpi_id ?? ""), 0);
-  // title+desc+type+driver+link+unit + 7 periods + weight = 14; +1 checkbox col when deleting
-  const totalCols = 14 + (isDeleteMode ? 1 : 0);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-10">
-        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (kpis.length === 0) {
-    return (
-      <p className="py-6 text-center text-sm text-muted-foreground">
-        No KPIs assigned in this group.
-      </p>
-    );
-  }
-
-  return (
-    <div className="overflow-x-auto">
-      <Table className="table-fixed w-full">
-        <colgroup>
-          {isDeleteMode && <col style={{ width: "36px" }} />}
-          <col style={{ width: "13%" }} />
-          <col style={{ width: "15%" }} />
-          <col style={{ width: "9%" }} />
-          <col style={{ width: "9%" }} />
-          <col style={{ width: "11%" }} />
-          <col style={{ width: "5%" }} />
-          {PERIODS.map((p) => <col key={p} style={{ width: "4%" }} />)}
-          <col style={{ width: "10%" }} />
-        </colgroup>
-        <TableHeader>
-          <TableRow>
-            {isDeleteMode && <TableHead />}
-            <TableHead>Title</TableHead>
-            <TableHead>Description</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Driver</TableHead>
-            <TableHead>{LINK_COL_LABEL[variant]}</TableHead>
-            <TableHead>Unit</TableHead>
-            {PERIODS.map((p) => (
-              <TableHead key={p} className="text-right">{PERIOD_LABEL[p]}</TableHead>
-            ))}
-            <TableHead className="text-right">Weight %</TableHead>
-          </TableRow>
-        </TableHeader>
-
-        <TableBody>
-          {kpis.map((kpi) => {
-            const boardId  = kpi.board_kpi_id ?? "";
-            const editRow  = (isEditMode && variant === "individual") ? (editingRows?.[boardId] ?? kpi) : kpi;
-            const ds       = DRIVER_STYLE[editRow.driver]   ?? DRIVER_STYLE.growth;
-            const ts       = TYPE_STYLE[editRow.kpi_type]   ?? TYPE_STYLE.progressive;
-            const isSelected = isDeleteMode && selectedForDelete?.has(boardId);
-
-            return (
-              <TableRow key={kpi.id} className={cn("align-top", isSelected && "bg-destructive/5")}>
-
-                {/* Checkbox (delete mode) */}
-                {isDeleteMode && (
-                  <TableCell className="align-middle pt-3">
-                    <Checkbox
-                      checked={isSelected}
-                      onCheckedChange={() => onToggleSelect?.(boardId)}
-                    />
-                  </TableCell>
-                )}
-
-                {/* Title */}
-                <TableCell className="font-medium align-top">
-                  {isEditMode && variant === "individual" ? (
-                    <Input
-                      value={editRow.title}
-                      onChange={(e) => onRowChange?.(boardId, (row) => ({ ...row, title: e.target.value }))}
-                      className="h-7 text-xs w-full"
-                    />
-                  ) : (
-                    <span className="block break-words whitespace-normal text-sm">{kpi.title}</span>
-                  )}
-                </TableCell>
-
-                {/* Description */}
-                <TableCell className="text-xs text-muted-foreground align-top">
-                  {isEditMode && variant === "individual" ? (
-                    <Input
-                      value={extractDeptRef(editRow.description ?? null).cleanDesc ?? ""}
-                      onChange={(e) => {
-                        const { deptRef } = extractDeptRef(editRow.description ?? null);
-                        const prefix = deptRef ? `Aligns to dept KPI: ${deptRef}. ` : "";
-                        const next   = e.target.value ? prefix + e.target.value : (deptRef ? prefix.trimEnd() : null);
-                        onRowChange?.(boardId, (row) => ({ ...row, description: next }));
-                      }}
-                      className="h-7 text-xs w-full"
-                    />
-                  ) : (
-                    <span className="block break-words whitespace-normal">
-                      {variant === "individual"
-                        ? (extractDeptRef(kpi.description ?? null).cleanDesc ?? "—")
-                        : (kpi.description ?? "—")}
-                    </span>
-                  )}
-                </TableCell>
-
-                {/* Type */}
-                <TableCell className="align-top">
-                  {isEditMode && variant === "individual" ? (
-                    <Select
-                      value={editRow.kpi_type}
-                      onValueChange={(v) => onRowChange?.(boardId, (row) => ({ ...row, kpi_type: v as KpiType }))}
-                    >
-                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="progressive">Progressive</SelectItem>
-                        <SelectItem value="binary">Binary</SelectItem>
-                        <SelectItem value="benchmark">Benchmark</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Badge variant="outline" className={cn("border-0 text-xs font-medium", ts.className)}>
-                      {ts.label}
-                    </Badge>
-                  )}
-                </TableCell>
-
-                {/* Driver */}
-                <TableCell className="align-top">
-                  {isEditMode && variant === "individual" ? (
-                    <Select
-                      value={editRow.driver}
-                      onValueChange={(v) => onRowChange?.(boardId, (row) => ({ ...row, driver: v as KpiDriver }))}
-                    >
-                      <SelectTrigger className="h-7 text-xs"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="growth">Growth</SelectItem>
-                        <SelectItem value="efficiency">Efficiency</SelectItem>
-                        <SelectItem value="culture">Culture</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Badge variant="outline" className={cn("border-0 text-xs font-medium", ds.bg, ds.text)}>
-                      {ds.label}
-                    </Badge>
-                  )}
-                </TableCell>
-
-                {/* Link column — always read-only */}
-                <TableCell className="text-xs align-top">
-                  {variant === "corporate" && (
-                    kpi.linked_dept_kpi_titles?.length ? (
-                      <div className="flex flex-col gap-0.5">
-                        {kpi.linked_dept_kpi_titles.map((t, i) => (
-                          <span key={i} className="block break-words whitespace-normal font-medium text-foreground">↗ {t}</span>
-                        ))}
-                      </div>
-                    ) : <span className="text-muted-foreground">—</span>
-                  )}
-                  {variant === "department" && (
-                    kpi.corp_kpi_title
-                      ? <span className="block break-words whitespace-normal font-medium text-foreground">↗ {kpi.corp_kpi_title}</span>
-                      : <span className="text-muted-foreground">—</span>
-                  )}
-                  {variant === "individual" && (
-                    kpi.dept_kpi_ref
-                      ? <span className="block break-words whitespace-normal font-medium text-foreground">↗ {kpi.dept_kpi_ref}</span>
-                      : <span className="text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-
-                {/* Unit */}
-                <TableCell className="text-xs text-muted-foreground align-top">
-                  {isEditMode && variant === "individual" ? (
-                    <Input
-                      value={editRow.unit ?? ""}
-                      onChange={(e) => onRowChange?.(boardId, (row) => ({ ...row, unit: e.target.value || null }))}
-                      className="h-7 text-xs w-16"
-                    />
-                  ) : (
-                    kpi.unit ?? "—"
-                  )}
-                </TableCell>
-
-                {/* Period targets */}
-                {PERIODS.map((p) => {
-                  if (isEditMode && variant === "individual") {
-                    const isBinary = editRow.scoring_type === "binary" || (editRow.scoring_type == null && editRow.kpi_type === "binary");
-                    const isDerived = DERIVED_PERIODS.has(p);
-
-                    if (isBinary) {
-                      if (BINARY_EDITABLE.has(p)) {
-                        return (
-                          <TableCell key={p} className="text-right align-middle pt-3">
-                            <Checkbox
-                              checked={editRow.period_targets?.[p]?.target_binary ?? false}
-                              onCheckedChange={(checked) =>
-                                onRowChange?.(boardId, (row) => ({
-                                  ...row,
-                                  period_targets: {
-                                    ...row.period_targets,
-                                    [p]: { target_value: null, target_binary: !!checked },
-                                  },
-                                }))
-                              }
-                            />
-                          </TableCell>
-                        );
-                      }
-                      return (
-                        <TableCell key={p} className="text-right text-xs text-muted-foreground align-top">—</TableCell>
-                      );
-                    }
-
-                    if (isDerived) {
-                      const derived = computeDerived(editRow.period_targets, p as "h1" | "h2" | "fullyear");
-                      return (
-                        <TableCell key={p} className="text-right align-top">
-                          <span className="text-xs italic text-muted-foreground">
-                            {derived !== null ? String(derived) : "—"}
-                          </span>
-                        </TableCell>
-                      );
-                    }
-
-                    return (
-                      <TableCell key={p} className="text-right align-top">
-                        <Input
-                          type="number"
-                          value={editRow.period_targets?.[p]?.target_value ?? ""}
-                          onChange={(e) => {
-                            const val = parseNum(e.target.value);
-                            onRowChange?.(boardId, (row) => ({
-                              ...row,
-                              period_targets: {
-                                ...row.period_targets,
-                                [p]: { target_value: val, target_binary: null },
-                              },
-                            }));
-                          }}
-                          className="h-7 w-full text-xs text-right"
-                        />
-                      </TableCell>
-                    );
-                  }
-
-                  // Read-only mode
-                  return (
-                    <TableCell key={p} className="text-right text-xs tabular-nums align-top">
-                      {DERIVED_PERIODS.has(p) ? (
-                        <span className="italic text-muted-foreground">
-                          {(kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary"))
-                            ? (BINARY_EDITABLE.has(p) ? periodCell(kpi, p) : "—")
-                            : (() => {
-                                const v = computeDerived(kpi.period_targets, p as "h1" | "h2" | "fullyear");
-                                return v !== null ? String(v) : "—";
-                              })()}
-                        </span>
-                      ) : (
-                        periodCell(kpi, p)
-                      )}
-                    </TableCell>
-                  );
-                })}
-
-                {/* Weight % — always editable */}
-                <TableCell className="align-top text-right">
-                  <div className="flex justify-end">
-                    <WeightInput
-                      ariaLabel={`Weight for ${kpi.title}`}
-                      value={getWeight(boardId)}
-                      onChange={(n) => setWeight(boardId, n)}
-                    />
-                  </div>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-
-        {/* Subtotal footer */}
-        <TableFooter>
-          <TableRow>
-            <TableCell colSpan={totalCols - 1} className="text-xs text-muted-foreground uppercase tracking-wide py-2">
-              Subtotal
-            </TableCell>
-            <TableCell className="text-right py-2">
-              <SubtotalLabel sum={subtotal} />
-            </TableCell>
-          </TableRow>
-        </TableFooter>
-      </Table>
-    </div>
-  );
-}
-
 /* ── AddIndividualKpiModal ──────────────────────────────────────────────────── */
 
 type IndKpiForm = {
   title: string;
   description: string;
-  kpi_type: KpiType;
+  period_agg_type: PeriodAggType;
+  scoring_type: ScoringType;
+  input_mode: InputMode;
   driver: KpiDriver;
   unitPreset: string;
   unitCustom: string;
   unitScoreOf: string;
   quarter_targets: Record<QuarterPeriod, string>;
+  all_targets: Record<string, string>;
   binary_targets: Record<BinaryTargetPeriod, boolean>;
 };
 
 const IND_EMPTY: IndKpiForm = {
-  title: "", description: "", kpi_type: "progressive", driver: "growth",
+  title: "", description: "",
+  period_agg_type: "additive_flow", scoring_type: "higher_is_better", input_mode: "periodic",
+  driver: "growth",
   unitPreset: "", unitCustom: "", unitScoreOf: "",
   quarter_targets: { q1: "", q2: "", q3: "", q4: "" },
+  all_targets: { q1: "", q2: "", h1: "", q3: "", q4: "", h2: "", fullyear: "" },
   binary_targets: { h1: false, fullyear: false },
 };
 
-function AddIndividualKpiModal({
+export function AddIndividualKpiModal({
   open, onOpenChange,
   personId, entityId, year,
   onSuccess,
@@ -636,13 +298,29 @@ function AddIndividualKpiModal({
     if (!open || !editKpiDefId) return;
     void (async () => {
       const { data: def } = await supabase
-        .from("kpi_definitions").select("title, description, kpi_type, driver, unit")
+        .from("kpi_definitions").select("title, description, kpi_type, driver, unit, period_agg_type, scoring_type, input_mode")
         .eq("id", editKpiDefId).single();
       if (!def) return;
 
       const { deptRef, cleanDesc } = extractDeptRef(def.description ?? null);
       const unitFields = reverseUnit(def.unit);
+
+      // Derive new fields from legacy kpi_type if not yet migrated
+      const aggType: PeriodAggType =
+        (def.period_agg_type as PeriodAggType | null) ??
+        (def.kpi_type === "binary" ? "milestone_state" : def.kpi_type === "benchmark" ? "snapshot_stock" : "additive_flow");
+      const scoringType: ScoringType =
+        (def.scoring_type as ScoringType | null) ??
+        (def.kpi_type === "binary" ? "binary" : "higher_is_better");
+      const inputMode: InputMode =
+        (def.input_mode as InputMode | null) ??
+        (def.kpi_type === "binary" ? "periodic" : def.kpi_type === "benchmark" ? "period_end_snapshot" : "periodic");
+
+      const isMilestoneEdit = aggType === "milestone_state";
+      const isSnapshotEdit  = aggType === "snapshot_stock" || inputMode === "period_end_snapshot" || inputMode === "manual_aggregate";
+
       let qt: Record<QuarterPeriod, string> = { q1: "", q2: "", q3: "", q4: "" };
+      let at: Record<string, string> = { q1: "", q2: "", h1: "", q3: "", q4: "", h2: "", fullyear: "" };
       let bt: Record<BinaryTargetPeriod, boolean> = { h1: false, fullyear: false };
 
       if (editIndKpiId) {
@@ -652,18 +330,23 @@ function AddIndividualKpiModal({
         for (const t of tgts ?? []) {
           if (["q1", "q2", "q3", "q4"].includes(t.period))
             qt[t.period as QuarterPeriod] = t.target_value != null ? String(t.target_value) : "";
+          at[t.period] = t.target_value != null ? String(t.target_value) : "";
           if (t.period === "h1")       bt.h1       = t.target_binary ?? false;
           if (t.period === "fullyear") bt.fullyear = t.target_binary ?? false;
         }
+        void isSnapshotEdit; void isMilestoneEdit; // used contextually
       }
 
       setValues({
         title: def.title,
         description: cleanDesc ?? "",
-        kpi_type: def.kpi_type as KpiType,
+        period_agg_type: aggType,
+        scoring_type: scoringType,
+        input_mode: inputMode,
         driver: def.driver as KpiDriver,
         ...unitFields,
         quarter_targets: qt,
+        all_targets: at,
         binary_targets: bt,
       });
 
@@ -690,21 +373,37 @@ function AddIndividualKpiModal({
   const update = <K extends keyof IndKpiForm>(key: K, val: IndKpiForm[K]) =>
     setValues((v) => ({ ...v, [key]: val }));
 
+  const isMilestone = values.period_agg_type === "milestone_state";
+  const isSnapshot =
+    values.period_agg_type === "snapshot_stock" ||
+    values.input_mode === "period_end_snapshot" ||
+    values.input_mode === "manual_aggregate";
+
   const q1 = parseNum(values.quarter_targets.q1);
   const q2 = parseNum(values.quarter_targets.q2);
   const q3 = parseNum(values.quarter_targets.q3);
   const q4 = parseNum(values.quarter_targets.q4);
-  const h1Computed = q1 !== null && q2 !== null ? q1 + q2 : null;
-  const h2Computed = q3 !== null && q4 !== null ? q3 + q4 : null;
-  const fyComputed = h1Computed !== null && h2Computed !== null ? h1Computed + h2Computed : null;
+  const derived = derivePeriods(q1, q2, q3, q4, values.period_agg_type);
+
+  const handleAggTypeChange = (agg: PeriodAggType) => {
+    const { scoringType, inputMode } = defaultsForAggType(agg);
+    setValues((v) => ({ ...v, period_agg_type: agg, scoring_type: scoringType, input_mode: inputMode }));
+  };
 
   const buildNumericRows = (fk: string, fkVal: string) => {
     const rows: Record<string, unknown>[] = [];
-    const qs: [QuarterPeriod, number | null][] = [["q1", q1], ["q2", q2], ["q3", q3], ["q4", q4]];
-    for (const [p, v] of qs) if (v !== null) rows.push({ [fk]: fkVal, period: p, target_value: v });
-    if (h1Computed !== null) rows.push({ [fk]: fkVal, period: "h1",       target_value: h1Computed });
-    if (h2Computed !== null) rows.push({ [fk]: fkVal, period: "h2",       target_value: h2Computed });
-    if (fyComputed  !== null) rows.push({ [fk]: fkVal, period: "fullyear", target_value: fyComputed  });
+    if (isSnapshot) {
+      for (const p of ALL_PERIODS) {
+        const val = parseNum(values.all_targets[p] ?? "");
+        if (val !== null) rows.push({ [fk]: fkVal, period: p, target_value: val });
+      }
+    } else {
+      const qs: [QuarterPeriod, number | null][] = [["q1", q1], ["q2", q2], ["q3", q3], ["q4", q4]];
+      for (const [p, v] of qs) if (v !== null) rows.push({ [fk]: fkVal, period: p, target_value: v });
+      if (derived.h1 !== null) rows.push({ [fk]: fkVal, period: "h1",       target_value: derived.h1 });
+      if (derived.h2 !== null) rows.push({ [fk]: fkVal, period: "h2",       target_value: derived.h2 });
+      if (derived.fy !== null) rows.push({ [fk]: fkVal, period: "fullyear", target_value: derived.fy });
+    }
     return rows;
   };
 
@@ -729,8 +428,8 @@ function AddIndividualKpiModal({
 
     setSaving(true);
     try {
-      const unit     = deriveUnit(values.unitPreset, values.unitCustom, values.unitScoreOf);
-      const isBinary = values.kpi_type === "binary";
+      const unit       = deriveUnit(values.unitPreset, values.unitCustom, values.unitScoreOf);
+      const legacyType = inferLegacyKpiType(values.period_agg_type, values.scoring_type);
 
       /* Build description with optional dept KPI ref prefix */
       let description = values.description.trim() || null;
@@ -742,13 +441,32 @@ function AddIndividualKpiModal({
 
       if (isEditMode && editKpiDefId && editIndKpiId) {
         /* ── Edit mode ── */
-        const { error: defErr } = await supabase
+        const updatePayload = {
+          title:           values.title.trim(),
+          description,
+          kpi_type:        legacyType,
+          period_agg_type: values.period_agg_type,
+          scoring_type:    values.scoring_type,
+          input_mode:      values.input_mode,
+          driver:          values.driver,
+          unit,
+        };
+        let updResult = await supabase
           .from("kpi_definitions")
-          .update({ title: values.title.trim(), description, kpi_type: values.kpi_type, driver: values.driver, unit })
+          .update(updatePayload)
           .eq("id", editKpiDefId);
-        if (defErr) throw new Error(defErr.message);
+        if (updResult.error) {
+          if (isCalcModelSchemaMissing(updResult.error.message)) {
+            updResult = await supabase
+              .from("kpi_definitions")
+              .update(omitCalcModelFields(updatePayload))
+              .eq("id", editKpiDefId);
+            if (!updResult.error) toast.warning(`Saved in compatibility mode. ${MIGRATION_HINT}`);
+          }
+          if (updResult.error) throw new Error(updResult.error.message);
+        }
 
-        const targetRows = isBinary
+        const targetRows = isMilestone
           ? buildBinaryRows("individual_kpi_id", editIndKpiId)
           : buildNumericRows("individual_kpi_id", editIndKpiId);
         if (targetRows.length > 0) {
@@ -761,10 +479,36 @@ function AddIndividualKpiModal({
         toast.success("Individual KPI updated.");
       } else {
         /* ── Add mode ── */
-        const { data: defData, error: defErr } = await supabase
+        const insertPayload = {
+          entity_id:       entityId,
+          title:           values.title.trim(),
+          description,
+          kpi_type:        legacyType,
+          period_agg_type: values.period_agg_type,
+          scoring_type:    values.scoring_type,
+          input_mode:      values.input_mode,
+          driver:          values.driver,
+          unit,
+          year,
+          is_active:       true,
+          created_by:      person.id,
+        };
+        let defRes = await supabase
           .from("kpi_definitions")
-          .insert({ entity_id: entityId, title: values.title.trim(), description, kpi_type: values.kpi_type, driver: values.driver, unit, year, is_active: true, created_by: person.id })
+          .insert(insertPayload)
           .select("id").single();
+        if (defRes.error) {
+          if (isCalcModelSchemaMissing(defRes.error.message)) {
+            defRes = await supabase
+              .from("kpi_definitions")
+              .insert(omitCalcModelFields(insertPayload))
+              .select("id").single();
+            if (defRes.data && !defRes.error)
+              toast.warning(`Saved in compatibility mode. ${MIGRATION_HINT}`);
+          }
+        }
+        const defData = defRes.data;
+        const defErr  = defRes.error;
         if (defErr || !defData) throw new Error(defErr?.message ?? "Failed to create KPI definition.");
 
         const { count: existingCount } = await supabase
@@ -781,7 +525,7 @@ function AddIndividualKpiModal({
           .select("id").single();
         if (indErr || !indData) throw new Error(indErr?.message ?? "Failed to create individual KPI.");
 
-        const targetRows = isBinary
+        const targetRows = isMilestone
           ? buildBinaryRows("individual_kpi_id", indData.id)
           : buildNumericRows("individual_kpi_id", indData.id);
         if (targetRows.length > 0) {
@@ -860,26 +604,65 @@ function AddIndividualKpiModal({
             />
           </div>
 
-          {/* KPI Type */}
-          <div className="space-y-2">
-            <Label>KPI Type</Label>
-            <RadioGroup value={values.kpi_type} onValueChange={(v) => update("kpi_type", v as KpiType)} className="gap-2">
-              {[
-                { id: "ind-type-prog",  value: "progressive", label: "Progressive", sub: "Tracked cumulatively by value" },
-                { id: "ind-type-bin",   value: "binary",      label: "Binary",      sub: "Achieved or not achieved"       },
-                { id: "ind-type-bench", value: "benchmark",   label: "Benchmark",   sub: "Point-in-time score"            },
-              ].map((t) => (
-                <Label key={t.id} htmlFor={t.id}
-                  className="flex cursor-pointer items-start gap-3 rounded-md border p-3 hover:bg-accent"
-                >
-                  <RadioGroupItem id={t.id} value={t.value} className="mt-0.5" />
-                  <span className="space-y-0.5">
-                    <span className="block text-sm font-medium">{t.label}</span>
-                    <span className="block text-xs text-muted-foreground">{t.sub}</span>
-                  </span>
-                </Label>
-              ))}
-            </RadioGroup>
+          {/* ── Calculation Model ── */}
+          <div className="rounded-md border bg-muted/10 p-3 space-y-3">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Calculation Model
+            </p>
+
+            {/* Period Aggregation Type */}
+            <div className="space-y-1.5">
+              <Label htmlFor="ind-agg-type">
+                Period Aggregation
+                <FieldInfo text={PERIOD_AGG_META[values.period_agg_type].description} />
+              </Label>
+              <Select value={values.period_agg_type} onValueChange={(v) => handleAggTypeChange(v as PeriodAggType)}>
+                <SelectTrigger id="ind-agg-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PERIOD_AGG_META) as PeriodAggType[]).map((k) => (
+                    <SelectItem key={k} value={k}>{PERIOD_AGG_META[k].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {PERIOD_AGG_META[values.period_agg_type].description}
+              </p>
+            </div>
+
+            {/* Scoring Type */}
+            <div className="space-y-1.5">
+              <Label htmlFor="ind-scoring-type">
+                Scoring
+                <FieldInfo text={SCORING_TYPE_META[values.scoring_type].description} />
+              </Label>
+              <Select value={values.scoring_type} onValueChange={(v) => update("scoring_type", v as ScoringType)}>
+                <SelectTrigger id="ind-scoring-type"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(SCORING_TYPE_META) as ScoringType[]).map((k) => (
+                    <SelectItem key={k} value={k}>{SCORING_TYPE_META[k].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground leading-snug">
+                {SCORING_TYPE_META[values.scoring_type].description}
+              </p>
+            </div>
+
+            {/* Input Mode */}
+            <div className="space-y-1.5">
+              <Label htmlFor="ind-input-mode">
+                Input Mode
+                <FieldInfo text={INPUT_MODE_META[values.input_mode].description} />
+              </Label>
+              <Select value={values.input_mode} onValueChange={(v) => update("input_mode", v as InputMode)}>
+                <SelectTrigger id="ind-input-mode"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(INPUT_MODE_META) as InputMode[]).map((k) => (
+                    <SelectItem key={k} value={k}>{INPUT_MODE_META[k].label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           {/* Driver */}
@@ -925,11 +708,54 @@ function AddIndividualKpiModal({
             <div className="space-y-0.5">
               <Label className="text-sm">Targets</Label>
               <p className="text-xs text-muted-foreground">
-                Enter quarterly targets — H1, H2, and Full Year are calculated automatically.
+                {isMilestone
+                  ? "Set whether the milestone should be achieved by H1 and/or by year-end."
+                  : isSnapshot
+                    ? "Enter each period independently — periods do not aggregate."
+                    : "Enter quarterly targets — H1, H2, and Full Year are derived automatically."}
               </p>
             </div>
 
-            {(values.kpi_type === "progressive" || values.kpi_type === "benchmark") && (
+            {/* Milestone / Binary */}
+            {isMilestone && (
+              <div className="space-y-3">
+                {[
+                  { id: "ind-bin-h1", field: "h1"       as BinaryTargetPeriod, label: "Achieved by H1?"       },
+                  { id: "ind-bin-fy", field: "fullyear" as BinaryTargetPeriod, label: "Achieved by Full Year?" },
+                ].map((b) => (
+                  <div key={b.id} className="flex items-center justify-between rounded-md border bg-background p-3">
+                    <Label htmlFor={b.id} className="text-sm font-normal">{b.label}</Label>
+                    <Switch id={b.id} checked={values.binary_targets[b.field]}
+                      onCheckedChange={(checked) => setValues((v) => ({
+                        ...v, binary_targets: { ...v.binary_targets, [b.field]: checked },
+                      }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Snapshot / all-period mode */}
+            {!isMilestone && isSnapshot && (
+              <div className="grid grid-cols-4 gap-2">
+                {ALL_PERIODS.map((p) => (
+                  <div key={p} className="space-y-1">
+                    <Label className="text-xs">{PERIOD_LABEL[p]}</Label>
+                    <Input
+                      type="number" inputMode="decimal" placeholder="—"
+                      value={values.all_targets[p] ?? ""}
+                      onChange={(e) => setValues((v) => ({
+                        ...v, all_targets: { ...v.all_targets, [p]: e.target.value },
+                      }))}
+                      className="h-8 text-xs"
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Periodic (additive / average) */}
+            {!isMilestone && !isSnapshot && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {QUARTER_FIELDS.map((f) => (
@@ -947,9 +773,9 @@ function AddIndividualKpiModal({
                 </div>
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { label: "H1 (Q1+Q2)", value: h1Computed },
-                    { label: "H2 (Q3+Q4)", value: h2Computed },
-                    { label: "Full Year",   value: fyComputed  },
+                    { label: "H1", value: derived.h1 },
+                    { label: "H2", value: derived.h2 },
+                    { label: "Full Year", value: derived.fy },
                   ].map(({ label, value }) => (
                     <div key={label} className="rounded-md border bg-background p-2">
                       <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
@@ -957,24 +783,6 @@ function AddIndividualKpiModal({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
-
-            {values.kpi_type === "binary" && (
-              <div className="space-y-3">
-                {[
-                  { id: "ind-bin-h1", field: "h1"       as BinaryTargetPeriod, label: "Achieved by H1?"       },
-                  { id: "ind-bin-fy", field: "fullyear" as BinaryTargetPeriod, label: "Achieved by Full Year?" },
-                ].map((b) => (
-                  <div key={b.id} className="flex items-center justify-between rounded-md border bg-background p-3">
-                    <Label htmlFor={b.id} className="text-sm font-normal">{b.label}</Label>
-                    <Switch id={b.id} checked={values.binary_targets[b.field]}
-                      onCheckedChange={(checked) => setValues((v) => ({
-                        ...v, binary_targets: { ...v.binary_targets, [b.field]: checked },
-                      }))}
-                    />
-                  </div>
-                ))}
               </div>
             )}
           </div>
@@ -1041,6 +849,26 @@ function WeightingAssignmentPage() {
   const [indMultiDeleting,     setIndMultiDeleting]     = useState(false);
   const [indDeleteStep,        setIndDeleteStep]        = useState<1 | 2 | null>(null);
 
+  /* ── Cross-table KPI navigation ── */
+  const [corpScrollTarget, setCorpScrollTarget] = useState<string | null>(null);
+  const [deptScrollTarget, setDeptScrollTarget] = useState<string | null>(null);
+  const [indScrollTarget,  setIndScrollTarget]  = useState<string | null>(null);
+
+  const kpiPanelMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const k of corpRows) map[k.board_kpi_id ?? k.id] = "corporate";
+    for (const k of deptRows) map[k.board_kpi_id ?? k.id] = "department";
+    for (const k of indRows)  map[k.board_kpi_id ?? k.id] = "individual";
+    return map;
+  }, [corpRows, deptRows, indRows]);
+
+  const handleNavigateToKpi = useCallback((rowKey: string, _targetVariant: KpiTableVariant) => {
+    const panelKey = kpiPanelMap[rowKey];
+    if (panelKey === "corporate")       setCorpScrollTarget(rowKey);
+    else if (panelKey === "department") setDeptScrollTarget(rowKey);
+    else if (panelKey === "individual") setIndScrollTarget(rowKey);
+  }, [kpiPanelMap]);
+
   /* ── Load employees ── */
   useEffect(() => {
     if (!allowed || !entity_id || !person?.id) return;
@@ -1086,6 +914,7 @@ function WeightingAssignmentPage() {
         .select("corporate_weight_pct, department_weight_pct, individual_weight_pct")
         .eq("entity_id", entity_id).eq("person_id", selectedPersonId).eq("year", selected_year)
         .maybeSingle(),
+      // NOTE: Requires migration 20260512000000_kpi_model_refactor.sql; refresh cache with NOTIFY pgrst, 'reload schema' if queries fail
       supabase
         .from("corporate_kpis")
         .select("id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
@@ -1094,6 +923,7 @@ function WeightingAssignmentPage() {
         .from("people_org_departments").select("org_department_id").eq("person_id", selectedPersonId),
       supabase
         .from("people_functional_departments").select("functional_department_id").eq("person_id", selectedPersonId),
+      // NOTE: Requires migration 20260512000000_kpi_model_refactor.sql; refresh cache with NOTIFY pgrst, 'reload schema' if queries fail
       supabase
         .from("individual_kpis")
         .select("id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
@@ -1124,13 +954,14 @@ function WeightingAssignmentPage() {
     const indIds      = (indKpisRaw.data  ?? []).map((r) => r.id);
 
     /* Phase 2 — needs IDs from Phase 1 */
-    const [corpTgtsRes, allDeptKpisRaw, indTgtsRes] = await Promise.all([
+    const [corpTgtsRes, allDeptKpisRaw, indTgtsRes, indDeptKpiRes] = await Promise.all([
       corpIds.length > 0
         ? supabase.from("corporate_kpi_targets")
             .select("corporate_kpi_id, period, target_value, target_binary")
             .in("corporate_kpi_id", corpIds)
         : Promise.resolve({ data: [] as { corporate_kpi_id: string; period: string; target_value: number | null; target_binary: boolean | null }[] }),
       (orgDeptIds.length > 0 || funcDeptIds.length > 0)
+        // NOTE: Requires migration 20260512000000_kpi_model_refactor.sql; refresh cache with NOTIFY pgrst, 'reload schema' if queries fail
         ? supabase.from("department_kpis")
             .select("id, org_department_id, functional_department_id, corporate_kpi_id, kpi_definitions(id, title, description, driver, kpi_type, period_agg_type, scoring_type, input_mode, unit)")
             .eq("entity_id", entity_id).eq("year", selected_year)
@@ -1140,6 +971,10 @@ function WeightingAssignmentPage() {
             .select("individual_kpi_id, period, target_value, target_binary")
             .in("individual_kpi_id", indIds)
         : Promise.resolve({ data: [] as { individual_kpi_id: string; period: string; target_value: number | null; target_binary: boolean | null }[] }),
+      // NOTE: Requires migration 20260511000000_add_department_kpi_link_to_individual_kpis.sql
+      indIds.length > 0
+        ? supabase.from("individual_kpis").select("id, department_kpi_id").in("id", indIds) as unknown as Promise<{ data: Array<{ id: string; department_kpi_id: string | null }> | null; error: unknown }>
+        : Promise.resolve({ data: [] as Array<{ id: string; department_kpi_id: string | null }> }),
     ]);
 
     /* Filter dept KPIs to those in employee's org/func departments */
@@ -1169,9 +1004,9 @@ function WeightingAssignmentPage() {
         : Promise.resolve({ data: [] as { id: string; kpi_definitions: unknown }[] }),
       corpIds.length > 0
         ? supabase.from("department_kpis")
-            .select("corporate_kpi_id, kpi_definitions(title)")
+            .select("id, corporate_kpi_id, kpi_definitions(title)")
             .in("corporate_kpi_id", corpIds)
-        : Promise.resolve({ data: [] as { corporate_kpi_id: string | null; kpi_definitions: unknown }[] }),
+        : Promise.resolve({ data: [] as { id: string; corporate_kpi_id: string | null; kpi_definitions: unknown }[] }),
     ]);
 
     /* Build target maps */
@@ -1198,15 +1033,20 @@ function WeightingAssignmentPage() {
       if (title) corpTitleMap.set(ck.id, title);
     }
 
-    /* Dept links map (for corp panel "Department KPI" column) */
-    type DeptLinkRow = { corporate_kpi_id: string | null; kpi_definitions: unknown };
-    const deptLinksMap = new Map<string, string[]>();
+    /* Individual KPI → dept KPI link map (requires migration 20260511000000) */
+    const indDeptKpiMap = new Map<string, string | null>();
+    for (const r of (indDeptKpiRes.data ?? [])) indDeptKpiMap.set(r.id, r.department_kpi_id);
+
+    /* Dept links map (for corp panel "Related KPIs" column) */
+    type DeptLinkRow = { id: string; corporate_kpi_id: string | null; kpi_definitions: unknown };
+    const deptLinksMap = new Map<string, { ids: string[]; titles: string[] }>();
     for (const dl of (deptLinksRes.data ?? []) as unknown as DeptLinkRow[]) {
       const cid   = dl.corporate_kpi_id;
       const title = (dl.kpi_definitions as { title: string } | null)?.title;
       if (cid && title) {
-        if (!deptLinksMap.has(cid)) deptLinksMap.set(cid, []);
-        deptLinksMap.get(cid)!.push(title);
+        if (!deptLinksMap.has(cid)) deptLinksMap.set(cid, { ids: [], titles: [] });
+        deptLinksMap.get(cid)!.ids.push(dl.id);
+        deptLinksMap.get(cid)!.titles.push(title);
       }
     }
 
@@ -1245,25 +1085,49 @@ function WeightingAssignmentPage() {
     }
 
     setCorpRows(
-      (corpKpisRaw.data ?? []).map((r) =>
-        toRow(r as RawKpi, corpTgtMap, { linked_dept_kpi_titles: deptLinksMap.get(r.id) ?? null }),
-      ),
+      (corpKpisRaw.data ?? []).map((r) => {
+        const links = deptLinksMap.get(r.id);
+        return toRow(r as RawKpi, corpTgtMap, {
+          linked_dept_kpi_titles: links?.titles ?? null,
+          precedent_kpi_ids:      links?.ids    ?? null,
+          precedent_kpi_titles:   links?.titles ?? null,
+        });
+      }),
     );
 
     setDeptRows(
-      filteredDept.map((r) =>
-        toRow(r as unknown as RawKpi, deptTgtMap, {
-          corp_kpi_id:    r.corporate_kpi_id ?? null,
-          corp_kpi_title: r.corporate_kpi_id ? (corpTitleMap.get(r.corporate_kpi_id) ?? null) : null,
-        }),
-      ),
+      filteredDept.map((r) => {
+        const corpTitle = r.corporate_kpi_id ? (corpTitleMap.get(r.corporate_kpi_id) ?? null) : null;
+        const precInds  = (indKpisRaw.data ?? []).filter(
+          (i) => indDeptKpiMap.get(i.id) === r.id,
+        );
+        return toRow(r as unknown as RawKpi, deptTgtMap, {
+          corp_kpi_id:          r.corporate_kpi_id ?? null,
+          corp_kpi_title:       corpTitle,
+          dependent_kpi_id:     r.corporate_kpi_id ?? null,
+          dependent_kpi_title:  corpTitle,
+          precedent_kpi_ids:    precInds.length ? precInds.map((i) => i.id) : null,
+          precedent_kpi_titles: precInds.length
+            ? precInds.map((i) => ((i.kpi_definitions as { title?: string } | null)?.title ?? "Untitled"))
+            : null,
+        });
+      }),
     );
 
     setIndRows(
       (indKpisRaw.data ?? []).map((r) => {
-        const def = r.kpi_definitions as { description: string | null } | null;
+        const def       = r.kpi_definitions as { description: string | null } | null;
         const { deptRef } = extractDeptRef(def?.description ?? null);
-        return toRow(r as RawKpi, indTgtMap, { dept_kpi_ref: deptRef });
+        const deptKpiId = indDeptKpiMap.get(r.id) ?? null;
+        const deptRow   = deptKpiId ? filteredDept.find((d) => d.id === deptKpiId) : null;
+        const deptTitle = deptRow
+          ? ((deptRow.kpi_definitions as { title?: string } | null)?.title ?? null)
+          : null;
+        return toRow(r as RawKpi, indTgtMap, {
+          dept_kpi_ref:        deptRef,
+          dependent_kpi_id:    deptKpiId,
+          dependent_kpi_title: deptTitle,
+        });
       }),
     );
 
@@ -1369,12 +1233,8 @@ function WeightingAssignmentPage() {
     setIndEditingRows({});
   }
 
-  const handleIndRowChange = (boardKpiId: string, updater: (row: WeightKpiRow) => WeightKpiRow) => {
-    setIndEditingRows((prev) => {
-      const cur = prev[boardKpiId];
-      if (!cur) return prev;
-      return { ...prev, [boardKpiId]: updater(cur) };
-    });
+  const handleIndRowChange = (boardKpiId: string, updated: KpiCardData) => {
+    setIndEditingRows((prev) => ({ ...prev, [boardKpiId]: updated as WeightKpiRow }));
   };
 
   const handleIndSaveAll = async () => {
@@ -1383,14 +1243,22 @@ function WeightingAssignmentPage() {
       for (const [boardKpiId, row] of Object.entries(indEditingRows)) {
         if (!row.title.trim()) { toast.error("KPI title cannot be empty."); return; }
 
+        const legacyType = inferLegacyKpiType(row.period_agg_type ?? null, row.scoring_type ?? null);
         const { error: defErr } = await supabase
           .from("kpi_definitions")
-          .update({ title: row.title.trim(), description: row.description, kpi_type: row.kpi_type, driver: row.driver, unit: row.unit })
+          .update({
+            title: row.title.trim(), description: row.description,
+            kpi_type: legacyType ?? row.kpi_type,
+            period_agg_type: row.period_agg_type ?? null,
+            scoring_type:    row.scoring_type    ?? null,
+            input_mode:      row.input_mode      ?? null,
+            driver: row.driver, unit: row.unit,
+          })
           .eq("id", row.id);
         if (defErr) throw new Error(defErr.message);
 
         const pt = row.period_targets ?? {};
-        const isBinary = row.kpi_type === "binary";
+        const isBinary = row.scoring_type === "binary" || (!row.scoring_type && row.kpi_type === "binary");
         const targetRows: Record<string, unknown>[] = [];
 
         if (isBinary) {
@@ -1403,14 +1271,12 @@ function WeightingAssignmentPage() {
           const q2 = pt["q2"]?.target_value ?? null;
           const q3 = pt["q3"]?.target_value ?? null;
           const q4 = pt["q4"]?.target_value ?? null;
-          const h1 = q1 !== null && q2 !== null ? q1 + q2 : null;
-          const h2 = q3 !== null && q4 !== null ? q3 + q4 : null;
-          const fy = h1 !== null && h2 !== null ? h1 + h2 : null;
+          const derived = derivePeriods(q1, q2, q3, q4, row.period_agg_type ?? null);
           const push = (period: string, val: number | null) => {
             if (val !== null) targetRows.push({ individual_kpi_id: boardKpiId, period, target_value: val });
           };
           push("q1", q1); push("q2", q2); push("q3", q3); push("q4", q4);
-          push("h1", h1); push("h2", h2); push("fullyear", fy);
+          push("h1", derived.h1); push("h2", derived.h2); push("fullyear", derived.fy);
         }
 
         if (targetRows.length > 0) {
@@ -1601,11 +1467,12 @@ function WeightingAssignmentPage() {
                       <CardTitle className="text-base">Corporate KPIs</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <WeightKpiTable
+                      <KpiTable
                         kpis={corpRows}
                         variant="corporate"
                         getWeight={(id) => getWeight("corporate", id)}
                         setWeight={(id, n) => setWeight("corporate", id, n)}
+                        subtotal={corpSubtotal}
                       />
                     </CardContent>
                     {corpRows.length > 0 && corpSubtotal !== 100 && (
@@ -1623,11 +1490,12 @@ function WeightingAssignmentPage() {
                       <CardTitle className="text-base">Department KPIs</CardTitle>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <WeightKpiTable
+                      <KpiTable
                         kpis={deptRows}
                         variant="department"
                         getWeight={(id) => getWeight("department", id)}
                         setWeight={(id, n) => setWeight("department", id, n)}
+                        subtotal={deptSubtotal}
                       />
                     </CardContent>
                     {deptRows.length > 0 && deptSubtotal !== 100 && (
@@ -1703,11 +1571,12 @@ function WeightingAssignmentPage() {
                       </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                      <WeightKpiTable
+                      <KpiTable
                         kpis={indRows}
                         variant="individual"
                         getWeight={(id) => getWeight("individual", id)}
                         setWeight={(id, n) => setWeight("individual", id, n)}
+                        subtotal={indSubtotal}
                         isEditMode={indIsEditMode}
                         editingRows={indEditingRows}
                         onRowChange={handleIndRowChange}

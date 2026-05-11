@@ -47,6 +47,11 @@ import {
   SCORING_TYPE_META,
   INPUT_MODE_META,
 } from "@/lib/kpi-engine";
+import {
+  isCalcModelSchemaMissing,
+  omitCalcModelFields,
+  MIGRATION_HINT,
+} from "@/lib/kpi-save-compat";
 
 export type KpiLevel = "corporate" | "department" | "individual";
 /** @deprecated Use PeriodAggType + ScoringType from kpi-engine instead */
@@ -481,20 +486,30 @@ export function AddKpiModal({
 
       /* ── edit mode ── */
       if (isEditMode && editKpiDefId) {
-        const updRes = await supabase
+        const updatePayload = {
+          title:           values.title.trim(),
+          description:     values.description.trim() || null,
+          kpi_type:        legacyType,
+          period_agg_type: values.period_agg_type,
+          scoring_type:    values.scoring_type,
+          input_mode:      values.input_mode,
+          driver:          values.driver,
+          unit,
+        };
+        let updRes = await supabase
           .from("kpi_definitions")
-          .update({
-            title:           values.title.trim(),
-            description:     values.description.trim() || null,
-            kpi_type:        legacyType,
-            period_agg_type: values.period_agg_type,
-            scoring_type:    values.scoring_type,
-            input_mode:      values.input_mode,
-            driver:          values.driver,
-            unit,
-          })
+          .update(updatePayload)
           .eq("id", editKpiDefId);
-        if (updRes.error) throw new Error(updRes.error.message);
+        if (updRes.error) {
+          if (isCalcModelSchemaMissing(updRes.error.message)) {
+            updRes = await supabase
+              .from("kpi_definitions")
+              .update(omitCalcModelFields(updatePayload))
+              .eq("id", editKpiDefId);
+            if (!updRes.error) toast.warning(`Saved in compatibility mode. ${MIGRATION_HINT}`);
+          }
+          if (updRes.error) throw new Error(updRes.error.message);
+        }
 
         if (editBoardKpiId && editBoardLevel) {
           const tgtTable =
@@ -534,24 +549,36 @@ export function AddKpiModal({
       }
 
       /* ── add mode ── */
-      const defRes = await supabase
+      const insertPayload = {
+        entity_id,
+        title:           values.title.trim(),
+        description:     values.description.trim() || null,
+        kpi_type:        legacyType,
+        period_agg_type: values.period_agg_type,
+        scoring_type:    values.scoring_type,
+        input_mode:      values.input_mode,
+        driver:          values.driver,
+        unit,
+        year:            selected_year,
+        is_active:       true,
+        created_by:      person.id,
+      };
+      let defRes = await supabase
         .from("kpi_definitions")
-        .insert({
-          entity_id,
-          title:           values.title.trim(),
-          description:     values.description.trim() || null,
-          kpi_type:        legacyType,
-          period_agg_type: values.period_agg_type,
-          scoring_type:    values.scoring_type,
-          input_mode:      values.input_mode,
-          driver:          values.driver,
-          unit,
-          year:            selected_year,
-          is_active:       true,
-          created_by:      person.id,
-        })
+        .insert(insertPayload)
         .select("id")
         .single();
+      if (defRes.error) {
+        if (isCalcModelSchemaMissing(defRes.error.message)) {
+          defRes = await supabase
+            .from("kpi_definitions")
+            .insert(omitCalcModelFields(insertPayload))
+            .select("id")
+            .single();
+          if (defRes.data && !defRes.error)
+            toast.warning(`Saved in compatibility mode. ${MIGRATION_HINT}`);
+        }
+      }
       if (defRes.error || !defRes.data)
         throw new Error(defRes.error?.message ?? "Failed to insert KPI definition.");
       const kpiDefinitionId = defRes.data.id;

@@ -35,6 +35,7 @@ import {
   VALUE_STYLE,
   PERIOD_AGG_META,
   SCORING_TYPE_META,
+  INPUT_MODE_META,
   type PeriodAggType,
   type ScoringType,
   type InputMode,
@@ -197,6 +198,11 @@ function KpiPanel({ kpi, actuals, saving, onUpdateValue, onUpdateBinary, onSave 
               <Badge variant="outline" className={cn("border-0 text-xs font-medium", ts.bg, ts.text)}>
                 {kpiTypeLabel(kpi)}
               </Badge>
+              {kpi.input_mode && (
+                <Badge variant="outline" className="border-0 text-xs font-medium bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                  {INPUT_MODE_META[kpi.input_mode].label}
+                </Badge>
+              )}
               {kpi.scoring_type && (
                 <span className="text-xs text-muted-foreground">
                   · {SCORING_TYPE_META[kpi.scoring_type].label}

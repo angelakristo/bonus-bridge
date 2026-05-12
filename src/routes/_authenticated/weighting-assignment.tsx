@@ -1473,6 +1473,9 @@ function WeightingAssignmentPage() {
                         getWeight={(id) => getWeight("corporate", id)}
                         setWeight={(id, n) => setWeight("corporate", id, n)}
                         subtotal={corpSubtotal}
+                        onNavigateToKpi={handleNavigateToKpi}
+                        scrollTarget={corpScrollTarget}
+                        onScrollHandled={() => setCorpScrollTarget(null)}
                       />
                     </CardContent>
                     {corpRows.length > 0 && corpSubtotal !== 100 && (
@@ -1496,6 +1499,9 @@ function WeightingAssignmentPage() {
                         getWeight={(id) => getWeight("department", id)}
                         setWeight={(id, n) => setWeight("department", id, n)}
                         subtotal={deptSubtotal}
+                        onNavigateToKpi={handleNavigateToKpi}
+                        scrollTarget={deptScrollTarget}
+                        onScrollHandled={() => setDeptScrollTarget(null)}
                       />
                     </CardContent>
                     {deptRows.length > 0 && deptSubtotal !== 100 && (
@@ -1583,6 +1589,9 @@ function WeightingAssignmentPage() {
                         isDeleteMode={indIsDeleteMode}
                         selectedForDelete={indSelectedForDelete}
                         onToggleSelect={toggleIndSelect}
+                        onNavigateToKpi={handleNavigateToKpi}
+                        scrollTarget={indScrollTarget}
+                        onScrollHandled={() => setIndScrollTarget(null)}
                       />
                     </CardContent>
                     {indRows.length > 0 && indSubtotal !== 100 && (

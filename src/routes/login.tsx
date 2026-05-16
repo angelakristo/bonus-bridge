@@ -8,10 +8,9 @@ import { useEntity } from "@/contexts/EntityContext";
 import { useMasterAuth } from "@/contexts/MasterAuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import bonusbridgeIcon   from "@/assets/bonusbridge-icon.png";
+import bonusbridgeIcon from "@/assets/bonusbridge-icon.png";
+import bbNameLogo from "@/assets/bbname.png";
 import bonusbridgeLoginLogo from "@/assets/bonusbridge-login-logo.png";
-import bbNameLogo        from "@/assets/bbname.png";
-import landingBg         from "@/assets/landing-bg.jpg";
 
 const CSS_FONTS = `
 @import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,400&display=swap');
@@ -84,8 +83,8 @@ function LanguageDropdown() {
               >
                 <span style={{ fontSize: "15px", lineHeight: 1 }}>{lang.flag}</span>
                 <span style={{ flex: 1 }}>{lang.name}</span>
-                {lang.active  && <span style={{ color: "#0d9488",  fontSize: "10px" }}>✓</span>}
-                {!lang.active && <span style={{ color: "#cbd5e1",  fontSize: "8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Soon</span>}
+                {lang.active  && <span style={{ color: "#0d9488", fontSize: "10px" }}>✓</span>}
+                {!lang.active && <span style={{ color: "#cbd5e1", fontSize: "8px", textTransform: "uppercase", letterSpacing: "0.06em" }}>Soon</span>}
               </button>
             ))}
           </div>
@@ -154,16 +153,15 @@ function LoginPage() {
   const bothFilled = email.trim().length > 0 && password.trim().length > 0;
 
   return (
-    <div
-      style={{
-        fontFamily: "'DM Sans', sans-serif",
-        minHeight: "100vh",
-        backgroundImage: `url(${landingBg})`,
-        backgroundSize: "cover",
-        backgroundPosition: "center center",
-        backgroundRepeat: "no-repeat",
-      }}
-    >
+    <div style={{
+      fontFamily: "'DM Sans', sans-serif",
+      minHeight: "100vh",
+      background: [
+        "radial-gradient(circle at 72% 45%, rgba(255,255,255,0.72) 0%, rgba(222,241,248,0.45) 36%, transparent 64%)",
+        "linear-gradient(135deg, #eef9fc 0%, #dff1f7 45%, #eaf7fb 100%)",
+      ].join(", "),
+      overflow: "hidden",
+    }}>
       <style dangerouslySetInnerHTML={{ __html: CSS_FONTS }} />
 
       {/* ── HEADER ── */}
@@ -171,49 +169,31 @@ function LoginPage() {
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 100,
         height: "64px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 36px",
-        background: "rgba(255,255,255,0.84)",
-        backdropFilter: "blur(18px) saturate(1.5)",
-        borderBottom: "1px solid rgba(26,58,110,0.08)",
-        boxShadow: "0 1px 20px rgba(26,58,110,0.07)",
+        padding: "0 40px",
+        background: "rgba(255,255,255,0.94)",
+        backdropFilter: "blur(16px) saturate(1.4)",
+        borderBottom: "1px solid rgba(26,58,110,0.06)",
+        boxShadow: "0 1px 16px rgba(26,58,110,0.05)",
       }}>
-        {/* Left: icon + name */}
-        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-          <img
-            src={bonusbridgeIcon}
-            alt="BonusBridge icon"
-            style={{ height: "34px", width: "auto" }}
-          />
-          <img
-            src={bbNameLogo}
-            alt="BonusBridge"
-            style={{ height: "22px", width: "auto", marginTop: "1px" }}
-          />
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <img src={bbNameLogo} alt="BonusBridge" style={{ height: "22px", width: "auto" }} />
         </div>
-
-        {/* Right: nav + language */}
         <nav style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-          {[
+          {([
             { label: "About",   href: "/about"   },
             { label: "FAQs",    href: "/faqs"    },
             { label: "Support", href: "/support" },
-          ].map(({ label, href }) => (
+          ] as { label: string; href: string }[]).map(({ label, href }) => (
             <a
-              key={href}
-              href={href}
+              key={href} href={href}
               style={{
                 fontSize: "13px", fontWeight: 500, color: "#1a3a6e",
-                textDecoration: "none",
-                padding: "5px 12px", borderRadius: "8px",
-                transition: "background 0.2s, color 0.2s",
+                textDecoration: "none", padding: "5px 14px", borderRadius: "8px",
+                transition: "background 0.2s",
                 fontFamily: "'DM Sans', sans-serif",
               }}
-              onMouseEnter={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = "rgba(26,58,110,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                (e.currentTarget as HTMLAnchorElement).style.background = "none";
-              }}
+              onMouseEnter={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "rgba(26,58,110,0.07)"; }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLAnchorElement).style.background = "none"; }}
             >
               {label}
             </a>
@@ -222,102 +202,99 @@ function LoginPage() {
         </nav>
       </header>
 
-      {/* ── MAIN SPLIT ── */}
-      <div style={{ display: "flex", height: "100vh", paddingTop: "64px" }}>
+      {/* ── MAIN ── */}
+      <div style={{
+        position: "relative",
+        display: "flex",
+        height: "100vh",
+        paddingTop: "64px",
+        alignItems: "center",
+        justifyContent: "center",
+        overflow: "hidden",
+        padding: "64px 16px 16px",
+      }}>
 
-        {/* ── LEFT 58% — branding over the 3D chart ── */}
+{/* ── Background logo image — full-width, behind the card ── */}
+<img
+  src={bonusbridgeLoginLogo}
+  alt=""
+  aria-hidden="true"
+  style={{
+    position: "fixed",
+
+    // залепена лево, десно и долу
+    left: 0,
+    top: 3,
+    // end-to-end хоризонтално
+    width: "125vw",
+    height: "auto",
+
+    maxWidth: "none",
+
+    transform: "translateX(-10%)",
+
+
+    // важно: не ја сечи сликата
+    objectFit: "contain",
+    objectPosition: "center bottom",
+
+    // нема scale, затоа што scale ти ја крева/сече сликата
+    // transform: "none",
+
+    opacity: 0.16,
+    pointerEvents: "none",
+    userSelect: "none",
+    zIndex: 0,
+  }}
+/>
+
+        {/* ── Centered login card ── */}
         <div
-          className="hidden lg:flex"
           style={{
-            width: "58%",
-            flexDirection: "column" as const,
-            alignItems: "flex-start",
-            justifyContent: "flex-start",
-            padding: "10vh 48px 0 7%",
-          }}
-        >
-          {/* Bridge icon + name */}
-          <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "18px" }}>
-            <img
-              src={bonusbridgeIcon}
-              alt="BonusBridge"
-              style={{
-                height: "64px", width: "auto",
-                filter: "drop-shadow(0 4px 14px rgba(26,58,110,0.16))",
-              }}
-            />
-            <img
-              src={bbNameLogo}
-              alt="BonusBridge"
-              style={{
-                height: "50px", width: "auto",
-                filter: "drop-shadow(0 2px 6px rgba(26,58,110,0.1))",
-              }}
-            />
-          </div>
-
-          {/* Tagline */}
-          <p style={{
-            fontFamily: "'DM Sans', sans-serif",
-            fontSize: "16px", fontWeight: 400,
-            color: "#2a4f7c",
-            letterSpacing: "0.015em",
-            margin: 0, lineHeight: 1.5,
-          }}>
-            Connecting performance to rewards
-          </p>
-        </div>
-
-        {/* ── RIGHT 42% — login card ── */}
-        <div
-          className="w-full lg:w-[42%]"
-          style={{
+            position: "relative",
+            zIndex: 2,
+            width: "100%",
+            maxWidth: "480px",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            padding: "24px 40px",
           }}
         >
           <div style={{
-            width: "100%", maxWidth: "388px",
-            background: "rgba(255,255,255,0.97)",
+            width: "100%",
+            maxWidth: "480px",
+            minHeight: "620px",
+            background: "#ffffff",
             border: "1px solid rgba(26,58,110,0.08)",
-            borderRadius: "22px",
-            padding: "38px 34px 34px",
-            boxShadow:
-              "0 24px 64px rgba(26,58,110,0.11)," +
-              "0 6px 24px rgba(26,58,110,0.07)," +
-              "0 1px 4px rgba(26,58,110,0.04)",
+            borderRadius: "28px",
+            padding: "60px 60px 52px",
+            boxShadow: "0 28px 80px rgba(15,45,75,0.13), 0 8px 24px rgba(15,45,75,0.07)",
+            display: "flex",
+            flexDirection: "column",
           }}>
 
-            {/* Panel header: sub-logo + name */}
-            <div style={{ display: "flex", flexDirection: "column" as const, alignItems: "center", marginBottom: "30px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                <img
-                  src={bonusbridgeLoginLogo}
-                  alt="BonusBridge"
-                  style={{ height: "40px", width: "auto" }}
-                />
-                <img
-                  src={bbNameLogo}
-                  alt="BonusBridge"
-                  style={{ height: "30px", width: "auto" }}
-                />
-              </div>
+            {/* panel header */}
+            <div style={{
+              display: "flex", flexDirection: "column",
+              alignItems: "center", marginBottom: "38px",
+            }}>
+              <img
+                src={bonusbridgeIcon}
+                alt="BonusBridge"
+                style={{ height: "64px", width: "auto", marginBottom: "16px" }}
+              />
               <p style={{
-                fontSize: "9.5px", fontWeight: 500,
-                letterSpacing: "0.2em", textTransform: "uppercase" as const,
-                color: "rgba(26,58,110,0.38)",
+                fontSize: "18px", fontWeight: 700,
+                color: "#1a2a45",
                 fontFamily: "'DM Sans', sans-serif",
-                margin: 0,
+                margin: 0, textAlign: "center", lineHeight: 1.35,
               }}>
                 Connecting performance to rewards
               </p>
             </div>
 
-            {/* Login form */}
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column" as const, gap: "10px" }}>
-
+            {/* login form */}
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               <Input
                 type="email"
                 autoComplete="email"
@@ -326,13 +303,13 @@ function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="rounded-2xl h-11 text-center"
+                className="rounded-full h-14 text-center"
                 style={{
-                  background: "#f4f8ff",
-                  border: "1.5px solid rgba(26,58,110,0.15)",
+                  background: "rgba(245,249,255,0.9)",
+                  border: "1.5px solid rgba(26,58,110,0.14)",
                   color: "#1a3a6e",
                   fontFamily: "'DM Sans', sans-serif",
-                  fontSize: "14px",
+                  fontSize: "15px",
                 }}
               />
 
@@ -345,28 +322,28 @@ function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="rounded-2xl h-11 text-center"
+                  className="rounded-full h-14 text-center"
                   style={{
-                    background: "#f4f8ff",
-                    border: "1.5px solid rgba(26,58,110,0.15)",
+                    background: "rgba(245,249,255,0.9)",
+                    border: "1.5px solid rgba(26,58,110,0.14)",
                     color: "#1a3a6e",
                     fontFamily: "'DM Sans', sans-serif",
-                    fontSize: "14px",
+                    fontSize: "15px",
                   }}
                 />
                 <button
                   type="button"
                   style={{
-                    marginTop: "5px", width: "100%",
-                    textAlign: "right" as const,
-                    fontSize: "11px",
-                    color: "rgba(26,58,110,0.4)",
+                    marginTop: "6px", width: "100%",
+                    textAlign: "right",
+                    fontSize: "12px",
+                    color: "rgba(26,58,110,0.42)",
                     background: "none", border: "none", cursor: "pointer",
                     fontFamily: "'DM Sans', sans-serif",
                     transition: "color 0.2s",
                   }}
                   onMouseEnter={(e) => { e.currentTarget.style.color = "#0d9488"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(26,58,110,0.4)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.color = "rgba(26,58,110,0.42)"; }}
                   onClick={() => toast.info("Contact your administrator to reset your password.")}
                 >
                   Forgot my password
@@ -376,17 +353,17 @@ function LoginPage() {
               <Button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl h-11 font-semibold text-sm"
+                className="w-full rounded-full h-14 font-semibold text-base"
                 style={{
                   background: bothFilled
                     ? "linear-gradient(135deg, #1a3a6e 0%, #0d9488 100%)"
                     : "rgba(26,58,110,0.06)",
-                  border: bothFilled ? "none" : "1.5px solid rgba(26,58,110,0.15)",
+                  border: bothFilled ? "none" : "1.5px solid rgba(26,58,110,0.14)",
                   color: bothFilled ? "white" : "rgba(26,58,110,0.32)",
                   fontFamily: "'DM Sans', sans-serif",
                   transition: "all 0.3s ease",
                   boxShadow: bothFilled
-                    ? "0 8px 26px rgba(13,148,136,0.28), 0 2px 8px rgba(26,58,110,0.2)"
+                    ? "0 8px 26px rgba(13,148,136,0.28), 0 2px 8px rgba(26,58,110,0.18)"
                     : "none",
                 }}
               >
@@ -394,50 +371,51 @@ function LoginPage() {
               </Button>
             </form>
 
-            {/* Dev preview */}
-            <div style={{ marginTop: "22px" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "10px" }}>
-                <div style={{ flex: 1, height: "1px", background: "rgba(26,58,110,0.1)" }} />
+            {/* dev preview */}
+            <div style={{ marginTop: "24px" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "12px" }}>
+                <div style={{ flex: 1, height: "1px", background: "rgba(26,58,110,0.09)" }} />
                 <span style={{
-                  fontSize: "9px", textTransform: "uppercase" as const,
+                  fontSize: "9px", textTransform: "uppercase",
                   letterSpacing: "0.14em",
                   color: "rgba(26,58,110,0.32)",
                   fontFamily: "'DM Sans', sans-serif",
                 }}>
                   Dev preview
                 </span>
-                <div style={{ flex: 1, height: "1px", background: "rgba(26,58,110,0.1)" }} />
+                <div style={{ flex: 1, height: "1px", background: "rgba(26,58,110,0.09)" }} />
               </div>
 
               <div style={{
-                borderRadius: "12px",
-                border: "1px dashed rgba(26,58,110,0.16)",
-                background: "rgba(26,58,110,0.025)",
-                padding: "10px",
+                borderRadius: "16px",
+                border: "1px dashed rgba(26,58,110,0.14)",
+                background: "rgba(26,58,110,0.02)",
+                padding: "12px",
               }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "10px" }}>
                   <Sparkles style={{ height: "11px", width: "11px", color: "rgba(13,148,136,0.6)" }} />
                   <span style={{
-                    fontSize: "10px",
+                    fontSize: "11px",
                     color: "rgba(26,58,110,0.38)",
                     fontFamily: "'DM Sans', sans-serif",
                   }}>
                     Skip auth · sign in as a role
                   </span>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
                   {(["ceo", "hr_rep", "manager", "employee"] as const).map((role) => (
                     <Button
                       key={role}
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="rounded-lg text-xs h-7 capitalize"
+                      className="rounded-full text-sm h-11 capitalize"
                       style={{
-                        background: "rgba(26,58,110,0.04)",
-                        border: "1px solid rgba(26,58,110,0.12)",
-                        color: "rgba(26,58,110,0.6)",
+                        background: "rgba(255,255,255,0.9)",
+                        border: "1.5px solid rgba(26,58,110,0.14)",
+                        color: "rgba(26,58,110,0.75)",
                         fontFamily: "'DM Sans', sans-serif",
+                        fontWeight: 500,
                       }}
                       disabled={previewing || submitting}
                       onClick={() => void handlePreview(role)}

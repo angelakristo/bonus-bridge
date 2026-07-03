@@ -74,7 +74,6 @@ function BonusAssignmentsPage() {
     if (!entity_id || !person?.id) return;
     setLoading(true);
 
-    // Restrict person scope for managers
     let personIds: string[] | null = null;
     if (!isCeo) {
       const { data: myDepts } = await supabase
@@ -94,7 +93,6 @@ function BonusAssignmentsPage() {
       personIds = Array.from(new Set((peers ?? []).map((p) => p.person_id)));
     }
 
-    // Load people
     let pq = supabase
       .from("people")
       .select("id, first_name, last_name")

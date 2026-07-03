@@ -1,22 +1,9 @@
-/**
- * Regression tests for AddKpiModal save path.
- *
- * Verifies that:
- *  1. Happy path: kpi_definitions INSERT includes period_agg_type, scoring_type,
- *     input_mode, and the legacy kpi_type.
- *  2. Schema fallback: when Supabase returns the "column not in schema cache"
- *     error, the save is retried without the three new fields and a warning
- *     toast is shown (no hard failure).
- *  3. Legacy rows (missing new fields) still load correctly in edit mode.
- */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// ── All vi.hoisted blocks run before module imports ────────────────────────────
 
-// Supabase mock state
 const supabaseMock = vi.hoisted(() => {
   type MockResponse = { data: unknown; error: { message: string } | null };
   const inserts: Record<string, unknown[]>      = {};

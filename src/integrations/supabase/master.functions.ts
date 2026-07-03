@@ -2,7 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { supabaseAdmin } from "@/integrations/supabase/client.server";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ProjectLeader = {
   id: string;
@@ -31,7 +30,6 @@ export type ProjectSummary = {
   payout_amount: number | null;
 };
 
-// ─── List all projects ────────────────────────────────────────────────────────
 
 const PERIOD_PRIORITY = ["fullyear", "halfyear", "q4", "q3", "q2", "q1"] as const;
 

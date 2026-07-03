@@ -32,7 +32,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
-// Flat nav items for non-CEO roles
 type NavItem = {
   title: string;
   url: string;
@@ -52,7 +51,6 @@ const FLAT_NAV_ITEMS: NavItem[] = [
   { title: "Upload Actuals",    url: "/actuals-upload",       icon: Upload,      roles: ["hr_rep"] },
 ];
 
-// CEO grouped nav structure
 type NavGroup = {
   title: string;
   icon: LucideIcon;
@@ -100,10 +98,8 @@ export function AppSidebar() {
   const isCeo = roles.includes("ceo");
   const isHrRep = roles.includes("hr_rep");
 
-  // Lock all non-Setup nav items until setup is complete (CEO / HR Rep only)
   const isLocked = (isCeo || isHrRep) && !isSetupComplete && !setupLoading;
 
-  // For CEO, track which groups are open (default all open)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     KPIs: true,
     Bonuses: true,
@@ -123,12 +119,11 @@ export function AppSidebar() {
       <Sidebar collapsible="icon">
         <SidebarContent>
           {isCeo ? (
-            // CEO: My Dashboard (flat) + grouped sections + Setup (flat, hidden post-setup)
             <SidebarGroup>
               <SidebarGroupLabel>Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
-                  {/* My Dashboard */}
+                  {}
                   <SidebarMenuItem>
                     {isLocked ? (
                       <SidebarMenuButton
@@ -149,7 +144,7 @@ export function AppSidebar() {
                     )}
                   </SidebarMenuItem>
 
-                  {/* Collapsible groups */}
+                  {}
                   {CEO_GROUPS.map((group) => (
                     <Collapsible
                       key={group.title}
@@ -187,7 +182,7 @@ export function AppSidebar() {
                     </Collapsible>
                   ))}
 
-                  {/* Setup — shown only while setup is incomplete */}
+                  {}
                   {!isSetupComplete && (
                     <SidebarMenuItem>
                       <SidebarMenuButton asChild isActive={isActive("/setup")} tooltip="Setup">
@@ -202,14 +197,12 @@ export function AppSidebar() {
               </SidebarGroupContent>
             </SidebarGroup>
           ) : (
-            // Non-CEO: flat nav filtered by role
             <SidebarGroup>
               <SidebarGroupLabel>Navigation</SidebarGroupLabel>
               <SidebarGroupContent>
                 <SidebarMenu>
                   {FLAT_NAV_ITEMS
                     .filter((item) => hasAnyRole(roles, item.roles))
-                    // Hide Setup once setup is complete
                     .filter((item) => !(item.url === "/setup" && isSetupComplete))
                     .map((item) => {
                       const isSetupItem = item.url === "/setup";

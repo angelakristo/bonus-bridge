@@ -23,7 +23,6 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<UpdatePersonRolesResult> => {
     const { person_id, entity_id, roles, functional_department_id } = data;
 
-    // 1. Verify person belongs to entity
     const personRes = await supabaseAdmin
       .from("people")
       .select("id")
@@ -35,7 +34,6 @@ export const updatePersonRoles = createServerFn({ method: "POST" })
       return { ok: false, error: "Person not found in this entity." };
     }
 
-    // 2. Fetch current roles
     const currentRes = await supabaseAdmin
       .from("people_roles")
       .select("role")

@@ -54,7 +54,6 @@ import {
 } from "@/lib/kpi-save-compat";
 
 export type KpiLevel = "corporate" | "department" | "individual";
-/** @deprecated Use PeriodAggType + ScoringType from kpi-engine instead */
 export type KpiType = "progressive" | "binary" | "benchmark";
 export type KpiDriver = "growth" | "efficiency" | "culture";
 
@@ -72,7 +71,6 @@ export type AddKpiFormValues = {
   unitCustom: string;
   unitScoreOf: string;
   quarter_targets: Record<QuarterPeriod, string>;
-  /** For snapshot/manual modes — all 7 period inputs */
   all_targets: Record<string, string>;
   binary_targets: Record<BinaryTargetPeriod, boolean>;
 };

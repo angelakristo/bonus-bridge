@@ -49,20 +49,14 @@ type Props = {
   selectedForDelete?: Set<string>;
   onToggleSelect?: (rowKey: string) => void;
   corpKpisForLink?: { id: string; title: string }[];
-  /** Weight column support — provide both to show the column. */
   getWeight?: (boardKpiId: string) => number;
   setWeight?: (boardKpiId: string, n: number) => void;
-  /** Precomputed subtotal for the footer row (shown when getWeight is provided). */
   subtotal?: number;
-  /** Called when a related-KPI click targets a row not in this table; parent handles cross-table navigation. */
   onNavigateToKpi?: (rowKey: string, targetVariant: KpiTableVariant) => void;
-  /** Externally injected scroll target; when set, this table scrolls to + highlights that row. */
   scrollTarget?: string | null;
-  /** Called after scrollTarget has been handled so the parent can clear it. */
   onScrollHandled?: () => void;
 };
 
-/* ── Style maps ── */
 
 const DRIVER_STYLE: Record<string, { bg: string; text: string; label: string }> = {
   growth:     { bg: "bg-green-100 dark:bg-green-900/30", text: "text-green-800 dark:text-green-300", label: "Growth"     },
@@ -92,7 +86,6 @@ const INPUT_SHORT: Record<InputMode, string> = {
   manual_aggregate:    "Manual",
 };
 
-/* ── Period columns ── */
 
 const PERIODS = ["q1", "q2", "h1", "q3", "q4", "h2", "fullyear"] as const;
 type Period = (typeof PERIODS)[number];
@@ -105,7 +98,6 @@ const BINARY_EDITABLE = new Set<Period>(["h1", "fullyear"]);
 
 const UNIT_OPTS = ["", "%", "EUR", "EUR M", "Count", "Score"] as const;
 
-/* ── Helpers ── */
 
 function isBinaryKpi(kpi: KpiCardData): boolean {
   return kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
@@ -122,7 +114,6 @@ function periodCell(kpi: KpiCardData, period: Period): string {
   return String(t.target_value);
 }
 
-/* ── Weight sub-components ── */
 
 function WeightInput({
   value, onChange, ariaLabel,
@@ -153,7 +144,6 @@ function SubtotalLabel({ sum }: { sum: number }) {
   return <span className={cn("text-sm font-medium", color)}>{sum}% of 100%</span>;
 }
 
-/* ── Related KPI badge ── */
 
 function RelatedKpiBadge({
   title, isDependent, onClick,
@@ -190,21 +180,19 @@ function RelatedKpiBadge({
   );
 }
 
-/* ── Variant inference ── */
 
 function inferPrecedentVariant(v: KpiTableVariant): KpiTableVariant {
   if (v === "corporate")  return "department";
   if (v === "department") return "individual";
-  return "department"; // library / individual have no well-defined lower level
+  return "department"; 
 }
 
 function inferDependentVariant(v: KpiTableVariant): KpiTableVariant {
   if (v === "department") return "corporate";
   if (v === "individual") return "department";
-  return "corporate"; // library / corporate have no well-defined upper level
+  return "corporate"; 
 }
 
-/* ── Component ── */
 
 export function KpiTable({
   kpis, variant, loading,
@@ -218,14 +206,12 @@ export function KpiTable({
   const showActions = variant !== "library" && (!!onEdit || !!onDelete) && !isEditMode && !isDeleteMode;
   const showWeight  = !!getWeight && !!setWeight;
 
-  // Total column count for footer colspan
   const totalCols =
     (isDeleteMode ? 1 : 0) +
-    15 +   // title + desc + period_agg + scoring + input_mode + related + driver + unit + 7 periods
+    15 +   
     (showWeight  ? 1 : 0) +
     (showActions ? 1 : 0);
 
-  // ── Scroll-to-row ──────────────────────────────────────────────────────────
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
   const [highlightedRow, setHighlightedRow] = useState<string | null>(null);
 
@@ -240,7 +226,6 @@ export function KpiTable({
     setTimeout(() => setHighlightedRow(null), 1500);
   }, [onNavigateToKpi]);
 
-  // ── External scroll target (cross-table navigation from parent) ────────────
   useEffect(() => {
     if (!scrollTarget) return;
     const el = rowRefs.current[scrollTarget];
@@ -250,8 +235,6 @@ export function KpiTable({
       setTimeout(() => setHighlightedRow(null), 1500);
     }
     onScrollHandled?.();
-    // onScrollHandled intentionally omitted from deps — it's a stable clear-state callback
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scrollTarget]);
 
   if (loading) {
@@ -321,9 +304,6 @@ export function KpiTable({
               change({ period_targets: pt });
             };
 
-            // ── Build related-KPI display data ────────────────────────────────
-            // Precedents: KPIs at the level below that point TO this KPI.
-            // Use new fields when present; fall back to legacy linked_dept_kpi_titles.
             const precedents: { rowKey: string | null; title: string }[] =
               kpi.precedent_kpi_titles?.length
                 ? kpi.precedent_kpi_titles.map((title, i) => ({
@@ -334,8 +314,6 @@ export function KpiTable({
                   ? (kpi.linked_dept_kpi_titles ?? []).map((title) => ({ rowKey: null, title }))
                   : [];
 
-            // Dependent: the KPI at the level above that this KPI points TO.
-            // Use new field when present; fall back to legacy corp_kpi_title / description prefix.
             const dependent: { rowKey: string | null; title: string } | null =
               kpi.dependent_kpi_title
                 ? { rowKey: kpi.dependent_kpi_id ?? null, title: kpi.dependent_kpi_title }
@@ -361,7 +339,7 @@ export function KpiTable({
                   isHighlighted && "bg-blue-50 dark:bg-blue-950/30 ring-2 ring-inset ring-blue-400",
                 )}
               >
-                {/* Checkbox */}
+                {}
                 {isDeleteMode && (
                   <TableCell className="px-3 pt-2.5">
                     <Checkbox
@@ -371,7 +349,7 @@ export function KpiTable({
                   </TableCell>
                 )}
 
-                {/* Title */}
+                {}
                 <TableCell className="font-medium align-top">
                   {isEditMode ? (
                     <Input
@@ -384,7 +362,7 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Description */}
+                {}
                 <TableCell className="text-xs text-muted-foreground align-top">
                   {isEditMode ? (
                     <Input
@@ -404,7 +382,7 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Period Aggregation */}
+                {}
                 <TableCell className="align-top">
                   {isEditMode ? (
                     <Select
@@ -430,7 +408,7 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Scoring */}
+                {}
                 <TableCell className="align-top">
                   {isEditMode ? (
                     <Select
@@ -451,7 +429,7 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Input Mode */}
+                {}
                 <TableCell className="align-top">
                   {isEditMode ? (
                     <Select
@@ -472,10 +450,9 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Related KPIs — precedents above, dependent below */}
+                {}
                 <TableCell className="align-top">
                   {variant === "department" && isEditMode ? (
-                    // Edit mode: corp KPI selector (sets the dependent link)
                     <Select
                       value={row.corp_kpi_id ?? "__none__"}
                       onValueChange={(v) => change({ corp_kpi_id: v === "__none__" ? null : v })}
@@ -513,7 +490,7 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Driver */}
+                {}
                 <TableCell className="align-top">
                   {isEditMode ? (
                     <Select
@@ -534,7 +511,7 @@ export function KpiTable({
                   )}
                 </TableCell>
 
-                {/* Unit */}
+                {}
                 <TableCell className="text-xs text-muted-foreground align-top">
                   {isEditMode ? (
                     UNIT_OPTS.includes((row.unit ?? "") as typeof UNIT_OPTS[number]) ? (
@@ -563,7 +540,7 @@ export function KpiTable({
                   ) : (kpi.unit ?? "—")}
                 </TableCell>
 
-                {/* Period targets */}
+                {}
                 {PERIODS.map((p) => (
                   <TableCell key={p} className="text-right text-xs tabular-nums align-top">
                     {isEditMode ? (
@@ -614,7 +591,7 @@ export function KpiTable({
                   </TableCell>
                 ))}
 
-                {/* Weight % */}
+                {}
                 {showWeight && (
                   <TableCell className="align-top text-right">
                     <WeightInput

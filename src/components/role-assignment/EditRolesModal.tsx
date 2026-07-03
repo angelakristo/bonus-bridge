@@ -88,7 +88,6 @@ export function EditRolesModal({
 
     setSaving(true);
     try {
-      // Fetch current roles
       const { data: currentData, error: fetchErr } = await supabase
         .from("people_roles")
         .select("role")

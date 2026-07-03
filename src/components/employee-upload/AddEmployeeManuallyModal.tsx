@@ -3,7 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Loader2, X } from "lucide-react";
 import { toast } from "sonner";
 
-import { supabase } from "@/integrations/supabase/client"; // used for dept/function dropdowns
+import { supabase } from "@/integrations/supabase/client"; 
 import { createEmployeeManually } from "@/integrations/supabase/create-employee.functions";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";

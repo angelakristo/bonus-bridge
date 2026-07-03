@@ -1,19 +1,3 @@
-/**
- * Chainable Supabase mock for vitest component tests.
- *
- * Usage in a test file:
- *
- *   const mock = vi.hoisted(() => createSupabaseMockState());
- *   vi.mock("@/integrations/supabase/client", () => ({ supabase: mock.client }));
- *
- *   beforeEach(() => mock.reset());
- *
- *   it("...", async () => {
- *     mock.queueResponse("kpi_definitions", { data: { id: "abc" }, error: null });
- *     // render + act ...
- *     expect(mock.getInserts("kpi_definitions")[0]).toMatchObject({ period_agg_type: "additive_flow" });
- *   });
- */
 
 import { vi } from "vitest";
 
@@ -24,7 +8,6 @@ export function createSupabaseMockState() {
   const updates: Record<string, unknown[]>    = {};
   const queues:  Record<string, MockResponse[]> = {};
 
-  // Default response per table when the queue is empty
   const defaultId = () => `mock-id-${Math.random().toString(36).slice(2, 9)}`;
   const defaultResponse = (table: string): MockResponse => ({
     data: { id: defaultId(), table },

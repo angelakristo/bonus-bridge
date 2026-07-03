@@ -35,7 +35,7 @@ function MasterLayout() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      {/* Top bar */}
+      {}
       <header className="shrink-0 border-b bg-card/95 backdrop-blur">
         <div className="flex h-14 items-center justify-between px-6">
           <div className="flex items-center gap-3">
@@ -64,7 +64,7 @@ function MasterLayout() {
         </div>
       </header>
 
-      {/* Page content */}
+      {}
       <main className="flex-1 overflow-y-auto">
         <div className="mx-auto max-w-6xl px-6 py-8">
           <Outlet />

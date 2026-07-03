@@ -66,10 +66,8 @@ function SetupLayout() {
         derived[row.step_key] = row.status;
       });
 
-      // entity_id is present → entity is registered
       derived.register_entity = "complete";
 
-      // Derive composite kpi_setup status from its three sub-keys
       const kpiSubKeys = ["set_driver_weightings", "configure_corporate_kpis", "configure_department_kpis"];
       const kpiStatuses = kpiSubKeys.map((k) => derived[k] ?? "not_started");
       if (kpiStatuses.every((s) => s === "complete")) {
@@ -105,8 +103,6 @@ function SetupLayout() {
     );
   }
 
-  // Once setup is complete, render the page content without the checklist sidebar.
-  // Wait until SetupContext has resolved to avoid a flash of the sidebar.
   if (!setupLoading && isSetupComplete) {
     return <Outlet />;
   }

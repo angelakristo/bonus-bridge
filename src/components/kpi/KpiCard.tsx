@@ -11,41 +11,28 @@ export type PeriodTarget = { target_value: number | null; target_binary: boolean
 
 export type KpiCardData = {
   id: string;
-  /** corporate_kpis.id or department_kpis.id — only set for board items, not library */
   board_kpi_id?: string;
   title: string;
   description?: string | null;
   driver: "growth" | "efficiency" | "culture";
   kpi_type: "progressive" | "binary" | "benchmark";
-  /** New calculation-model fields — nullable until migration back-fills legacy rows */
   period_agg_type?: PeriodAggType | null;
   scoring_type?: ScoringType | null;
   input_mode?: InputMode | null;
   unit: string | null;
-  /** All period targets keyed by period string (q1, q2, h1, q3, q4, h2, fullyear). */
   period_targets?: Record<string, PeriodTarget>;
-  /** Convenience accessor kept for backward compat — mirrors period_targets.fullyear.target_value */
   yearend_target_value: number | null;
   yearend_target_binary: boolean | null;
-  // Only populated for library cards
   source_label?: "Corporate" | "Department" | null;
   dept_name?: string | null;
   func_name?: string | null;
-  /** Title of the linked corporate KPI (dept KPIs only) */
   corp_kpi_title?: string | null;
-  /** corporate_kpis.id that this dept KPI is linked to (dept KPIs only) */
   corp_kpi_id?: string | null;
-  /** Dept KPI titles that reference this corporate KPI (corporate KPIs only) */
   linked_dept_kpi_titles?: string[] | null;
 
-  // ── Cross-level relationship fields ─────────────────────────────────────────
-  /** board_kpi_ids of KPIs at the level below that point TO this KPI */
   precedent_kpi_ids?: string[] | null;
-  /** Display titles for precedent_kpi_ids (parallel array) */
   precedent_kpi_titles?: string[] | null;
-  /** board_kpi_id of the KPI at the level above that this KPI points TO */
   dependent_kpi_id?: string | null;
-  /** Display title for dependent_kpi_id */
   dependent_kpi_title?: string | null;
 };
 
@@ -61,13 +48,11 @@ const LEGACY_TYPE_LABEL: Record<string, string> = {
   benchmark:   "Benchmark",
 };
 
-/** Returns a short badge label: new model when available, legacy fallback otherwise. */
 function getTypeLabel(kpi: KpiCardData): string {
   if (kpi.period_agg_type) return PERIOD_AGG_META[kpi.period_agg_type].shortLabel;
   return LEGACY_TYPE_LABEL[kpi.kpi_type] ?? "—";
 }
 
-/** Secondary scoring label — shown only when new model is present and non-obvious. */
 function getScoringLabel(kpi: KpiCardData): string | null {
   if (!kpi.scoring_type) return null;
   return SCORING_TYPE_META[kpi.scoring_type].label;

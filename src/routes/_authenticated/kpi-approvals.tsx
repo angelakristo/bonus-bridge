@@ -78,7 +78,6 @@ function KpiApprovalsPage() {
     if (!allowed || !entity_id || !person?.id) return;
     setLoading(true);
 
-    // Determine scope of person_ids the user can review.
     let personIds: string[] | null = null;
     if (!isCeo) {
       const { data: myDepts } = await supabase

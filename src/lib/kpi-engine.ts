@@ -1,18 +1,4 @@
-/**
- * KPI Calculation Engine
- *
- * Single source of truth for:
- *  - period derivation (H1/H2/FY from quarters) by aggregation type
- *  - achievement % calculation by scoring type
- *  - period consistency validation
- *  - value-origin CSS styling (user-entered vs calculated)
- *  - human-readable label maps for all three enum types
- *
- * Used by AddKpiModal, KpiTable, actuals-upload, dashboards,
- * and the weighting-assignment page.
- */
 
-// ── Enum types ────────────────────────────────────────────────────────────────
 
 export type PeriodAggType =
   | "additive_flow"
@@ -37,7 +23,6 @@ export type InputMode =
   | "component_based"
   | "manual_aggregate";
 
-// ── Period constants ──────────────────────────────────────────────────────────
 
 export const PERIODS = ["q1", "q2", "h1", "q3", "q4", "h2", "fullyear"] as const;
 export type Period = (typeof PERIODS)[number];
@@ -47,43 +32,29 @@ export type QuarterPeriod = (typeof QUARTER_PERIODS)[number];
 
 export const DERIVED_PERIODS = new Set<Period>(["h1", "h2", "fullyear"]);
 
-/** Periods that accept binary targets/actuals */
 export const BINARY_EDITABLE_PERIODS = new Set<Period>(["h1", "fullyear"]);
 
 export const PERIOD_LABEL: Record<Period, string> = {
   q1: "Q1", q2: "Q2", h1: "H1", q3: "Q3", q4: "Q4", h2: "H2", fullyear: "FY",
 };
 
-// ── Value origin ──────────────────────────────────────────────────────────────
 
 export type ValueOrigin = "user_entered" | "calculated" | "none";
 
-/**
- * Tailwind class strings for value display.
- * user_entered = blue text on bright-yellow background
- * calculated   = normal foreground, no background (muted italic optional via the caller)
- */
 export const VALUE_STYLE: Record<ValueOrigin, string> = {
   user_entered: "text-blue-700 bg-yellow-100 font-medium",
   calculated:   "text-foreground",
   none:         "text-muted-foreground",
 };
 
-// ── Period derivation ─────────────────────────────────────────────────────────
 
 export type DerivedPeriods = {
   h1: number | null;
   h2: number | null;
   fy: number | null;
-  /** Which derived values were computable */
   origin: { h1: ValueOrigin; h2: ValueOrigin; fy: ValueOrigin };
 };
 
-/**
- * Given the four quarterly values, compute H1, H2, and FY based on the
- * aggregation type.  Returns null for any period that cannot be derived
- * from available inputs.
- */
 export function derivePeriods(
   q1: number | null,
   q2: number | null,
@@ -113,7 +84,6 @@ export function derivePeriods(
 
     case "snapshot_stock":
     case "milestone_state": {
-      // Each period is independent; derived periods = latest available in the window
       const h1 = q2 ?? q1;
       const h2 = q4 ?? q3;
       const fy = q4 ?? q3 ?? q2 ?? q1;
@@ -155,10 +125,6 @@ export function derivePeriods(
   }
 }
 
-/**
- * Derive a single period value from a full period map.
- * Used by KpiTable to compute the read-only derived cells.
- */
 export function deriveSinglePeriod(
   periodTargets: Partial<Record<string, { target_value: number | null; target_binary: boolean | null }>>,
   period: "h1" | "h2" | "fullyear",
@@ -175,15 +141,7 @@ export function deriveSinglePeriod(
   return null;
 }
 
-// ── Achievement calculation ───────────────────────────────────────────────────
 
-/**
- * Compute achievement percentage.  Returns null when the calculation is
- * not possible (missing data, division by zero, etc.).
- *
- * scoringType governs the formula; kpiTypeFallback is used when
- * scoringType is not yet set (legacy rows).
- */
 export function calcAchievementPct(
   actual: number | null,
   actualBinary: boolean | null,
@@ -208,12 +166,10 @@ export function calcAchievementPct(
       return Math.round((target / actual) * 100 * 100) / 100;
 
     case "target_range":
-      // Requires min/max; fall back to higher_is_better until range config is stored
       if (actual === null || target === null || target === 0) return null;
       return Math.round((actual / target) * 100 * 100) / 100;
 
     case "threshold_tiered":
-      // Requires tier thresholds; fall back to higher_is_better
       if (actual === null || target === null || target === 0) return null;
       return Math.round((actual / target) * 100 * 100) / 100;
 
@@ -222,10 +178,6 @@ export function calcAchievementPct(
   }
 }
 
-/**
- * Format an achievement % for display (e.g. "94.50%").
- * Returns "—" when null.
- */
 export function fmtAchievement(pct: number | null): string {
   if (pct === null) return "—";
   return `${pct.toFixed(1)}%`;

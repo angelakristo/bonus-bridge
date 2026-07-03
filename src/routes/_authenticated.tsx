@@ -6,7 +6,6 @@ import { useEntity } from "@/contexts/EntityContext";
 import { useSetupStatus } from "@/contexts/SetupContext";
 import { AppShell } from "@/components/app-shell/AppShell";
 
-// Routes accessible while setup is still incomplete (CEO / HR Rep)
 const SETUP_ALLOWED_PATHS = new Set([
   "/setup",
   "/register-entity",
@@ -70,7 +69,6 @@ function AuthenticatedLayout() {
       return;
     }
 
-    // Setup lockdown: CEO / HR Rep must complete setup before accessing other routes
     const isSetupUser = roles.includes("ceo") || roles.includes("hr_rep");
     if (isSetupUser && entity_id && !setupLoading && !isSetupComplete) {
       if (!SETUP_ALLOWED_PATHS.has(location.pathname)) {

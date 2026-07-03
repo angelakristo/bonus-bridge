@@ -46,7 +46,6 @@ function RegisterEntityPage() {
     });
   };
 
-  // Access guard: only hr_rep
   useEffect(() => {
     if (!authReady || authLoading) return;
     if (!isHrRep) {
@@ -56,7 +55,6 @@ function RegisterEntityPage() {
     }
   }, [authReady, authLoading, isHrRep, roles, navigate]);
 
-  // Prepopulate from existing entity
   useEffect(() => {
     if (!entity_id) return;
     setPrefilling(true);

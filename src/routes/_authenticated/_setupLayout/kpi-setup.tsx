@@ -34,7 +34,6 @@ export const Route = createFileRoute("/_authenticated/_setupLayout/kpi-setup")({
   component: KpiSetupPage,
 });
 
-/* ── Driver types ─────────────────────────────────────────────────────────── */
 
 type DriverKey = "growth" | "efficiency" | "culture";
 
@@ -49,7 +48,6 @@ function clamp(n: number) {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
-/* ── Allocation bar ───────────────────────────────────────────────────────── */
 
 type BarSegment = { key: DriverKey; pct: number; bar: string; label: string };
 

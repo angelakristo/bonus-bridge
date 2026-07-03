@@ -45,9 +45,6 @@ export function ActionCentre() {
   const loadManager = useCallback(async () => {
     if (!entity_id || !person?.id) return;
 
-    // Determine which person_ids this user can review.
-    // CEO: all people in the entity.
-    // Manager: people who share at least one org_department with the manager.
     let personIds: string[] | null = null;
 
     if (!isCeo) {

@@ -51,7 +51,7 @@ function SupportPage() {
     <div className="h-screen overflow-hidden bg-sky-50">
       <div className="h-full overflow-y-auto p-6">
         <div className="mx-auto max-w-2xl">
-          {/* Header */}
+          {}
           <div className="mb-6 flex items-center gap-3">
             <a
               href="/login"

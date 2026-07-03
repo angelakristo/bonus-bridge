@@ -64,13 +64,11 @@ export const Route = createFileRoute("/_authenticated/weighting-assignment")({
   component: WeightingAssignmentPage,
 });
 
-/* ── Types ──────────────────────────────────────────────────────────────────── */
 
 type KpiLevel   = "corporate" | "department" | "individual";
 type KpiType    = "progressive" | "binary" | "benchmark";
 type KpiDriver  = "growth" | "efficiency" | "culture";
 
-/** KpiCardData extended with the dept-KPI reference extracted from the description prefix. */
 type WeightKpiRow = KpiCardData & { dept_kpi_ref?: string | null };
 
 type QuarterPeriod      = "q1" | "q2" | "q3" | "q4";
@@ -121,7 +119,6 @@ function FieldInfo({ text }: { text: string }) {
   );
 }
 
-/* ── Helpers ────────────────────────────────────────────────────────────────── */
 
 function clampPct(n: number): number {
   if (Number.isNaN(n)) return 0;

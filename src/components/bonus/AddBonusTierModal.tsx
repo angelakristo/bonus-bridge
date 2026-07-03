@@ -29,7 +29,6 @@ type Props = {
   onCreated: () => void;
 };
 
-// A tier covers [min, max] inclusive. A null max means "and above" (open-ended).
 function rangesOverlap(
   aMin: number,
   aMax: number | null,

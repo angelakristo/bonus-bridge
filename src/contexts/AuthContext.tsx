@@ -18,15 +18,12 @@ type AuthContextValue = {
   person: Person | null;
   roles: UserRole[];
   loading: boolean;
-  /** True once the initial session + person + roles resolution has completed. */
   ready: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
-  /** Signs in as a canonical demo persona. Requires seed data in Supabase. */
   devPreviewSignIn: (role: UserRole) => Promise<{ error: Error | null }>;
 };
 
-/** Email addresses for the four canonical demo personas. Password: Demo2025! */
 const DEMO_EMAILS: Record<UserRole, string> = {
   ceo:      "sofia@northwindtech.demo",
   hr_rep:   "marcus@northwindtech.demo",

@@ -114,7 +114,6 @@ function DepartmentSetupPage() {
     }
     const incoming = data ?? [];
     setDepartments(incoming);
-    // Remove stale assignments for deleted departments
     const deptIds = new Set(incoming.map((d) => d.id));
     setAssignments((prev) => {
       const next: Record<string, string[]> = {};
@@ -127,10 +126,8 @@ function DepartmentSetupPage() {
 
   useEffect(() => {
     fetchDepartments();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entity_id]);
 
-  // Fetch global functional departments (pre-seeded, no entity_id filter)
   useEffect(() => {
     supabase
       .from("functions")
@@ -145,7 +142,6 @@ function DepartmentSetupPage() {
       });
   }, []);
 
-  // Persist assignments to localStorage keyed by entity
   useEffect(() => {
     if (!entity_id) return;
     const stored = localStorage.getItem(`bb_dept_setup_${entity_id}`);

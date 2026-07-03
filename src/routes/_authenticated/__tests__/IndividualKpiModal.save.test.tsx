@@ -1,19 +1,8 @@
-/**
- * Regression tests for AddIndividualKpiModal save path (weighting-assignment).
- *
- * Verifies that:
- *  1. Happy path: kpi_definitions INSERT includes period_agg_type, scoring_type,
- *     input_mode, and the legacy kpi_type — same contract as AddKpiModal.
- *  2. Schema fallback: when Supabase returns the "column not in schema cache"
- *     error, the save retries without the three new fields and shows a warning.
- *  3. Legacy rows (null new fields) still load correctly in edit mode.
- */
 
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// ── vi.hoisted: all mock state self-contained ──────────────────────────────────
 
 const supabaseMock = vi.hoisted(() => {
   type MockResponse = { data: unknown; error: { message: string } | null };

@@ -59,7 +59,6 @@ export const Route = createFileRoute("/_authenticated/_setupLayout/team-setup")(
   component: TeamSetupPage,
 });
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 type PersonRow = {
   id: string;
@@ -91,7 +90,6 @@ type PendingEdit = {
 type OrgDept = { id: string; name: string };
 type FuncDept = { id: string; name: string };
 
-// ─── Excel template ───────────────────────────────────────────────────────────
 
 const UPLOAD_HEADERS = [
   "first_name",
@@ -100,9 +98,7 @@ const UPLOAD_HEADERS = [
   "department",
 ] as const;
 
-// downloadTemplate is defined inside TeamSetupPage so it can use loaded orgDepts.
 
-// ─── ALL_ROLES constant ───────────────────────────────────────────────────────
 
 const ALL_ROLES: { value: UserRole; label: string }[] = [
   { value: "employee", label: "Employee" },
@@ -111,7 +107,6 @@ const ALL_ROLES: { value: UserRole; label: string }[] = [
   { value: "ceo", label: "CEO" },
 ];
 
-// ─── EditEmployeeModal ────────────────────────────────────────────────────────
 
 type EditModalProps = {
   open: boolean;
@@ -163,7 +158,6 @@ function EditEmployeeModal({
     setForm(source);
   }, [open, person, pending]);
 
-  // Compute available functional departments when org dept changes
   useEffect(() => {
     if (!form.org_department_id || !entityId) {
       setAvailableFuncDepts([]);

@@ -55,7 +55,6 @@ export const Route = createFileRoute(
   component: BonusSetupPage,
 });
 
-// ─── Shared types ─────────────────────────────────────────────────────────────
 
 type UserRole = Database["public"]["Enums"]["user_role"];
 
@@ -66,7 +65,6 @@ const ROLE_LABEL: Record<UserRole, string> = {
   employee: "Employee",
 };
 
-// ─── Bonus Schemes section types ──────────────────────────────────────────────
 
 type SchemeRow = {
   id: string;

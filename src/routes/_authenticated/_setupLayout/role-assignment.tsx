@@ -232,7 +232,7 @@ function RoleAssignmentPage() {
         />
       )}
 
-      {/* Proceed Button */}
+      {}
       <div className="flex justify-end pt-2">
         <Button onClick={handleProceed} disabled={proceeding || !entity_id}>
           {proceeding ? "Saving..." : "Proceed to Set Driver Weightings"}

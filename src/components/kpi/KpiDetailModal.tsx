@@ -91,8 +91,6 @@ export function KpiDetailModal({ open, onOpenChange, kpi }: Props) {
   const isBinary = kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
   const targetByPeriod = new Map(targets.map((t) => [t.period, t]));
 
-  // For binary KPIs show h1 (or legacy halfyear) and fullyear only.
-  // For numeric, suppress legacy halfyear rows when h1 data is present.
   const visiblePeriods = isBinary
     ? (["h1", "halfyear", "fullyear"] as TargetRow["period"][]).filter(
         (p) => targetByPeriod.has(p) || p === "fullyear",

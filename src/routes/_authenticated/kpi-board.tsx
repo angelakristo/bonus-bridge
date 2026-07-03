@@ -34,7 +34,6 @@ export const Route = createFileRoute("/_authenticated/kpi-board")({
   component: KpiBoardPage,
 });
 
-/* ── Types & constants ────────────────────────────────────────────────────── */
 
 type OrgDept = { id: string; name: string };
 const MAX_KPIS_PER_BOARD = 10;

@@ -49,7 +49,6 @@ function MasterProjectsPage() {
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Open-project dialog state
   const [openDialog, setOpenDialog] = useState<{
     email: string;
     name: string;

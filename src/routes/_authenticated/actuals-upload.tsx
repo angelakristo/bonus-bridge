@@ -46,7 +46,6 @@ export const Route = createFileRoute("/_authenticated/actuals-upload")({
   component: ActualsUploadPage,
 });
 
-/* ── Constants ─────────────────────────────────────────────────────────────── */
 
 const PERIODS = ["q1", "q2", "h1", "q3", "q4", "h2", "fullyear"] as const;
 type Period = (typeof PERIODS)[number];
@@ -73,7 +72,6 @@ const LEVEL_STYLE: Record<string, { bg: string; text: string; label: string }> =
   individual: { bg: "bg-teal-100 dark:bg-teal-900/30",     text: "text-teal-800 dark:text-teal-300",     label: "Individual" },
 };
 
-/* ── Types ─────────────────────────────────────────────────────────────────── */
 
 type FilterTab = "all" | "corporate" | "department" | "individual";
 
@@ -100,9 +98,8 @@ type KpiRow = {
 
 type ActualEntry  = { value: string; binary: boolean | null; dirty: boolean };
 type PeriodActualsMap = Record<string, ActualEntry>;
-type KpiActualsMap    = Record<string, PeriodActualsMap>; // board_kpi_id -> period -> entry
+type KpiActualsMap    = Record<string, PeriodActualsMap>; 
 
-/* ── Helpers ───────────────────────────────────────────────────────────────── */
 
 function isBinaryKpi(kpi: KpiRow): boolean {
   return kpi.scoring_type === "binary" || (kpi.scoring_type == null && kpi.kpi_type === "binary");
@@ -116,10 +113,6 @@ function formatTarget(kpi: KpiRow, target: PeriodTarget | undefined): string {
   return target.target_value !== null ? String(target.target_value) : "—";
 }
 
-/**
- * Return the effective actual value for a period, computing derived periods
- * (H1/H2/FY) from quarterly entries for additive KPI types.
- */
 function effectiveActualValue(
   periodData: PeriodActualsMap,
   period: Period,
@@ -158,13 +151,11 @@ function fmtAchieved(kpi: KpiRow, target: PeriodTarget | undefined, periodData: 
   return fmtAchievement(pct);
 }
 
-/** Short badge label for KPI type — new model when available, legacy fallback. */
 function kpiTypeLabel(kpi: KpiRow): string {
   if (kpi.period_agg_type) return PERIOD_AGG_META[kpi.period_agg_type].shortLabel;
   return kpi.kpi_type === "progressive" ? "Progressive" : kpi.kpi_type === "binary" ? "Binary" : "Benchmark";
 }
 
-/* ── KpiPanel ──────────────────────────────────────────────────────────────── */
 
 type KpiPanelProps = {
   kpi: KpiRow;
@@ -244,7 +235,7 @@ function KpiPanel({ kpi, actuals, saving, onUpdateValue, onUpdateBinary, onSave 
             </TableRow>
           </TableHeader>
           <TableBody>
-            {/* Row 1 — Targets (read-only) */}
+            {}
             <TableRow className="bg-muted/40 hover:bg-muted/40">
               <TableCell className="text-xs font-medium text-muted-foreground py-2">Target</TableCell>
               {PERIODS.map((p) => (
@@ -254,7 +245,7 @@ function KpiPanel({ kpi, actuals, saving, onUpdateValue, onUpdateBinary, onSave 
               ))}
             </TableRow>
 
-            {/* Row 2 — Actuals (editable; derived periods show computed value) */}
+            {}
             <TableRow>
               <TableCell className="text-xs font-medium py-1">Actuals</TableCell>
               {PERIODS.map((p) => {
@@ -323,7 +314,7 @@ function KpiPanel({ kpi, actuals, saving, onUpdateValue, onUpdateBinary, onSave 
               })}
             </TableRow>
 
-            {/* Row 3 — % Achieved (computed) */}
+            {}
             <TableRow className="bg-muted/20 hover:bg-muted/20">
               <TableCell className="text-xs font-medium text-muted-foreground py-2">% Achieved</TableCell>
               {PERIODS.map((p) => (
@@ -339,7 +330,6 @@ function KpiPanel({ kpi, actuals, saving, onUpdateValue, onUpdateBinary, onSave 
   );
 }
 
-/* ── Page ──────────────────────────────────────────────────────────────────── */
 
 function ActualsUploadPage() {
   const { person } = useAuth();
@@ -356,7 +346,6 @@ function ActualsUploadPage() {
   const [actualsMap, setActualsMap]       = useState<KpiActualsMap>({});
   const [savingSet, setSavingSet]         = useState<Set<string>>(new Set());
 
-  /* Load org departments once */
   useEffect(() => {
     if (!entity_id) return;
     supabase
@@ -367,7 +356,6 @@ function ActualsUploadPage() {
       .then(({ data }) => setOrgDepts(data ?? []));
   }, [entity_id]);
 
-  /* Load employees when dept changes (individual filter) */
   useEffect(() => {
     if (!entity_id) return;
     if (!selectedDeptId) {

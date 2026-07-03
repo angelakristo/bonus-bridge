@@ -25,7 +25,6 @@ const LANGS = [
   { code: "sv", flag: "🇸🇪", name: "Svenska",    active: false },
 ];
 
-// ── Language dropdown ─────────────────────────────────────────────────────────
 function LanguageDropdown() {
   const [open, setOpen] = useState(false);
   return (

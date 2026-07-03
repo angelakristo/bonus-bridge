@@ -55,7 +55,6 @@ export function ManagerDashboard() {
   const [bonusRows, setBonusRows] = useState<BonusRow[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Load team person IDs once
   useEffect(() => {
     if (!person?.id || !entity_id) return;
     (async () => {

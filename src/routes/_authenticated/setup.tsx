@@ -90,7 +90,6 @@ function SetupPage() {
       derived.upload_employees =
         (uploadsRes.count ?? 0) > 0 ? "complete" : derived.upload_employees ?? "not_started";
 
-      // Merge the three KPI sub-steps into one "kpi_setup" status
       const kpiSubKeys = ["set_driver_weightings", "configure_corporate_kpis", "configure_department_kpis"] as const;
       const kpiStatuses = kpiSubKeys.map((k) => derived[k] ?? "not_started");
       if (kpiStatuses.every((s) => s === "complete")) {

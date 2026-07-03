@@ -1,7 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from "react";
 
-// Hardcoded master/consultant credentials.
-// This account sits above all tenant roles and manages all projects.
 const MASTER_EMAIL = "sp@tc.mk";
 const MASTER_PASSWORD = "bosilovo";
 const SESSION_KEY = "bb_master_session";
@@ -25,7 +23,7 @@ export function MasterAuthProvider({ children }: { children: ReactNode }) {
 
   const masterSignIn = (email: string, password: string): boolean => {
     if (email === MASTER_EMAIL && password === MASTER_PASSWORD) {
-      try { sessionStorage.setItem(SESSION_KEY, "true"); } catch { /* noop */ }
+      try { sessionStorage.setItem(SESSION_KEY, "true"); } catch {  }
       setIsMaster(true);
       return true;
     }
@@ -33,7 +31,7 @@ export function MasterAuthProvider({ children }: { children: ReactNode }) {
   };
 
   const masterSignOut = () => {
-    try { sessionStorage.removeItem(SESSION_KEY); } catch { /* noop */ }
+    try { sessionStorage.removeItem(SESSION_KEY); } catch {  }
     setIsMaster(false);
   };
 

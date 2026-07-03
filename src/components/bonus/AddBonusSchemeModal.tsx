@@ -63,7 +63,6 @@ export function AddBonusSchemeModal({
     setSaving(true);
     setError(null);
 
-    // Uniqueness check — when editing, exclude the current scheme
     const nameChanged = !editing || trimmed.toLowerCase() !== editing.name.toLowerCase();
     if (nameChanged) {
       const { data: existing, error: checkErr } = await supabase

@@ -1,7 +1,5 @@
 import { cn } from "@/lib/utils";
 
-/* Suspension cable geometry: M 117,44 C 160,112 320,112 363,44
- * Suspender y-values are approximated from the cubic bezier at each x. */
 const SUSPENDERS: { x: number; cy: number; delay: string }[] = [
   { x: 140, cy: 72,  delay: "2.32s" },
   { x: 165, cy: 85,  delay: "2.40s" },
@@ -38,7 +36,7 @@ export function BridgeTransition({ className }: Props) {
         }
       `}</style>
 
-      {/* Brand title */}
+      {}
       <div
         className="mb-8 text-center bb-a"
         style={{ animation: "bb-up 0.5s ease-out 0.1s both" }}
@@ -51,18 +49,18 @@ export function BridgeTransition({ className }: Props) {
         </h1>
       </div>
 
-      {/* Bridge */}
+      {}
       <div className="w-full max-w-[500px] px-6">
         <svg viewBox="0 0 480 200" fill="none" aria-hidden="true" className="w-full overflow-visible">
 
-          {/* Water */}
+          {}
           <rect x="0" y="180" width="480" height="20" fill="#071420" />
           <rect x="0" y="178" width="480" height="5"  fill="#0b1e30" />
           <ellipse cx="85"  cy="189" rx="38" ry="3" stroke="#162d42" strokeWidth="1" opacity="0.7" />
           <ellipse cx="290" cy="192" rx="50" ry="2.5" stroke="#162d42" strokeWidth="1" opacity="0.5" />
           <ellipse cx="430" cy="186" rx="30" ry="2" stroke="#162d42" strokeWidth="1" opacity="0.6" />
 
-          {/* ── LEFT TOWER ── */}
+          {}
           <rect x="100" y="170" width="34" height="12" fill="#2e5c78" rx="1" />
           <g
             className="bb-a"
@@ -75,7 +73,7 @@ export function BridgeTransition({ className }: Props) {
             <rect x="106" y="34"  width="22" height="9" fill="#4e8aac" rx="1" />
           </g>
 
-          {/* ── RIGHT TOWER ── */}
+          {}
           <rect x="346" y="170" width="34" height="12" fill="#2e5c78" rx="1" />
           <g
             className="bb-a"
@@ -88,25 +86,25 @@ export function BridgeTransition({ className }: Props) {
             <rect x="352" y="34"  width="22" height="9" fill="#4e8aac" rx="1" />
           </g>
 
-          {/* Left backstay cable */}
+          {}
           <path d="M 117,43 L 62,176" stroke="#c99020" strokeWidth="2.5" pathLength="1"
             className="bb-s" style={{ strokeDasharray:"1", strokeDashoffset:"1", animation:"bb-draw 0.45s ease-in 0.9s both" }} />
 
-          {/* Right backstay cable */}
+          {}
           <path d="M 363,43 L 418,176" stroke="#c99020" strokeWidth="2.5" pathLength="1"
             className="bb-s" style={{ strokeDasharray:"1", strokeDashoffset:"1", animation:"bb-draw 0.45s ease-in 0.9s both" }} />
 
-          {/* Main suspension cable */}
+          {}
           <path d="M 117,43 C 160,112 320,112 363,43" stroke="#c99020" strokeWidth="2.5" pathLength="1"
             className="bb-s" style={{ strokeDasharray:"1", strokeDashoffset:"1", animation:"bb-draw 0.75s ease-in-out 0.9s both" }} />
 
-          {/* Road deck */}
+          {}
           <path d="M 70,158 L 410,158" stroke="#5a9cba" strokeWidth="7" strokeLinecap="round" pathLength="1"
             className="bb-s" style={{ strokeDasharray:"1", strokeDashoffset:"1", animation:"bb-draw 0.65s ease-out 1.65s both" }} />
           <path d="M 70,154.5 L 410,154.5" stroke="#7abcd4" strokeWidth="1.5" strokeLinecap="round" pathLength="1"
             className="bb-s" style={{ strokeDasharray:"1", strokeDashoffset:"1", animation:"bb-draw 0.65s ease-out 1.65s both" }} />
 
-          {/* Suspender cables */}
+          {}
           {SUSPENDERS.map(({ x, cy, delay }) => (
             <line key={x} x1={x} y1={cy} x2={x} y2={158}
               stroke="#3a7898" strokeWidth="1.5" pathLength="1"

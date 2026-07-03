@@ -57,13 +57,11 @@ function NewProjectPage() {
   const navigate = useNavigate();
   const { masterSignOut } = useMasterAuth();
 
-  // Form state
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
   const [users, setUsers] = useState<UserDraft[]>([EMPTY_USER()]);
   const [submitting, setSubmitting] = useState(false);
 
-  // Result state
   const [result, setResult] = useState<CreateProjectResult | null>(null);
   const [openingEmail, setOpeningEmail] = useState<string | null>(null);
   const [openPassword, setOpenPassword] = useState("");

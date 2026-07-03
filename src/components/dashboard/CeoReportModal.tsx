@@ -14,7 +14,6 @@ import type { KpiCardData } from "@/components/kpi/KpiCard";
 import { KpiTable } from "@/components/kpi/KpiTable";
 import logoUrl from "@/assets/bonusbridge-full.png";
 
-/* ── Types ────────────────────────────────────────────────────────────────── */
 
 type OrgDept = { id: string; name: string };
 
@@ -26,7 +25,6 @@ export type Props = {
   year: number;
 };
 
-/* ── Period helpers ───────────────────────────────────────────────────────── */
 
 const PERIODS = ["q1", "q2", "h1", "q3", "q4", "h2", "fullyear"] as const;
 type Period = (typeof PERIODS)[number];
@@ -45,7 +43,6 @@ function periodCell(kpi: KpiCardData, period: Period): string {
   return String(t.target_value);
 }
 
-/* ── Data fetchers ────────────────────────────────────────────────────────── */
 
 async function fetchCorporateKpis(entityId: string, year: number): Promise<KpiCardData[]> {
   const { data, error } = await supabase
@@ -144,7 +141,6 @@ async function fetchDepartmentKpis(entityId: string, year: number, orgDeptId: st
   });
 }
 
-/* ── Logo loader ─────────────────────────────────────────────────────────── */
 
 async function loadLogoForWatermark(src: string, opacity: number): Promise<{ dataUrl: string; aspectRatio: number }> {
   const img = new Image();
@@ -165,7 +161,6 @@ async function loadLogoForWatermark(src: string, opacity: number): Promise<{ dat
   };
 }
 
-/* ── PDF generator ────────────────────────────────────────────────────────── */
 
 const NAVY: [number, number, number] = [30, 41, 59];
 const MUTED: [number, number, number] = [100, 116, 139];
@@ -176,22 +171,20 @@ const BORDER: [number, number, number] = [226, 232, 240];
 const DRIVER_LABEL: Record<string, string> = { growth: "Growth", efficiency: "Efficiency", culture: "Culture" };
 const TYPE_LABEL:   Record<string, string> = { progressive: "Progressive", binary: "Binary", benchmark: "Benchmark" };
 
-// 13 columns matching KpiTable column order: Title, Description, Type, Driver, [Link], Unit, Q1–FY
-// Total width 255 mm — fits within 273 mm usable on A4 landscape (297 mm − 2 × 12 mm margin)
 const BOARD_COL_WIDTHS = {
-  0:  { cellWidth: 38 },  // Title
-  1:  { cellWidth: 46 },  // Description
-  2:  { cellWidth: 22 },  // Type
-  3:  { cellWidth: 22 },  // Driver
-  4:  { cellWidth: 38 },  // Link column (Related KPI / Department KPI / Corporate KPI)
-  5:  { cellWidth: 12 },  // Unit
-  6:  { cellWidth: 11 },  // Q1
-  7:  { cellWidth: 11 },  // Q2
-  8:  { cellWidth: 11 },  // H1
-  9:  { cellWidth: 11 },  // Q3
-  10: { cellWidth: 11 },  // Q4
-  11: { cellWidth: 11 },  // H2
-  12: { cellWidth: 11 },  // FY
+  0:  { cellWidth: 38 },  
+  1:  { cellWidth: 46 },  
+  2:  { cellWidth: 22 },  
+  3:  { cellWidth: 22 },  
+  4:  { cellWidth: 38 },  
+  5:  { cellWidth: 12 },  
+  6:  { cellWidth: 11 },  
+  7:  { cellWidth: 11 },  
+  8:  { cellWidth: 11 },  
+  9:  { cellWidth: 11 },  
+  10: { cellWidth: 11 },  
+  11: { cellWidth: 11 },  
+  12: { cellWidth: 11 },  
 };
 
 async function generatePdf(
@@ -206,8 +199,8 @@ async function generatePdf(
   const { dataUrl: wmDataUrl, aspectRatio: wmAR } = await loadLogoForWatermark(logoUrl, 0.07);
 
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const PW = doc.internal.pageSize.getWidth();   // 297 mm
-  const PH = doc.internal.pageSize.getHeight();  // 210 mm
+  const PW = doc.internal.pageSize.getWidth();   
+  const PH = doc.internal.pageSize.getHeight();  
   const M  = 12;
 
   const wmW = PW * 0.55;
